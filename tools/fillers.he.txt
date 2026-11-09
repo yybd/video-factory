@@ -1,0 +1,20 @@
+# Hebrew filler words — hesitation sounds only, removed by "clean": ["fillers"].
+# One per line; punctuation is ignored when matching. Discourse markers that carry meaning
+# ("כאילו", "נו", "בעצם", "יעני") are deliberately NOT here: cutting them cuts real speech.
+# Add one for a single project with the part's own judgement, not here.
+אה
+אהה
+אההה
+אמ
+אממ
+אמממ
+הממ
+הממם
+ממ
+מממ
+אהם
+# how whisper spells them
+אמם
+עמם
+עממ
+אהמ

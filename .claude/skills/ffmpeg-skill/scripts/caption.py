@@ -683,6 +683,10 @@ def write_ass(cues: List[Tuple[float, float, str]], path: str, args, play_w: int
     word_upcoming = ass_color(args.upcoming_color)
     word_bord = f"{args.outline * scale * (max(1.0, args.karaoke_scale) / 100.0):.2f}"
     word_scale = int(round(args.karaoke_scale))
+    # [video-factory patch] Encoding -1 lets libass detect the paragraph direction. With the
+    # default 1 a karaoke line -- split into one colour run per word -- is laid out LTR, so a
+    # Hebrew/Arabic sentence comes out with its words in reverse order. See VENDORED.md.
+    encoding = -1 if any(detect_script(c[2]) in BIDI_SCRIPTS for c in cues) else 1
     # --karaoke-style word emits one Dialogue per word carrying the WHOLE cue with explicit \N
     # breaks (the layout's own fixed line list -- see max_line_em's docstring). WrapStyle: 2 tells
     # libass to honour only those explicit breaks and never re-wrap: with WrapStyle: 0 (the sweep
@@ -695,7 +699,7 @@ def write_ass(cues: List[Tuple[float, float, str]], path: str, args, play_w: int
         f"WrapStyle: {2 if word_style else 0}", "ScaledBorderAndShadow: yes", "YCbCr Matrix: None", "",
         "[V4+ Styles]",
         "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-        f"Style: Default,{ass_font_name(args.font)},{size},{primary},{secondary},{outline},{back},{-1 if args.bold else 0},0,0,0,100,100,0,0,{3 if args.box else 1},{args.outline * scale:.1f},{args.shadow * scale:.1f},{ALIGN[args.position]},{margin_l},{margin_r},{margin},1",
+        f"Style: Default,{ass_font_name(args.font)},{size},{primary},{secondary},{outline},{back},{-1 if args.bold else 0},0,0,0,100,100,0,0,{3 if args.box else 1},{args.outline * scale:.1f},{args.shadow * scale:.1f},{ALIGN[args.position]},{margin_l},{margin_r},{margin},{encoding}",
         "", "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
     ]
     lines = []
