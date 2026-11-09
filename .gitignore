@@ -1,0 +1,20 @@
+# Every video project lives in projects/<name>/ — sources, transcripts, parts, renders.
+# Personal media never goes to git; only the README that explains the folder does.
+projects/*
+!projects/README.md
+
+# Media anywhere else in the tree
+*.mp4
+*.mov
+*.m4v
+*.mkv
+*.webm
+*.wav
+*.aiff
+*.mp3
+*.m4a
+
+__pycache__/
+*.pyc
+.DS_Store
+.env
