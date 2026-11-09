@@ -30,7 +30,11 @@ projects/<name>/          one folder per video project — gitignored, never com
 `python3 tools/vf.py doctor` — ffmpeg-full with libass, ffmpeg-skill, a transcription engine.
 
 ### 1. Intake
-`python3 tools/vf.py new <name> <video>...` — creates the project and links the sources.
+`python3 tools/vf.py new <name> <video-or-folder>...` — creates the project and **links** the
+sources (a folder contributes its top-level video files). The user does not prepare anything:
+a path to their folder is enough. Add `--copy` only when a link would break: the folder is
+on an external drive, in iCloud / Google Drive, or the user is about to move the originals.
+A cloud file that is not downloaded is refused with a message — tell the user to download it.
 Ask for the goal only if it changes the edit: destination (YouTube 16:9 / Reels 9:16),
 target length, audience. Otherwise assume 16:9, keep the natural length, and say so.
 

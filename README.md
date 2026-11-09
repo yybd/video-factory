@@ -52,8 +52,12 @@ claude
 
 Then, in Claude Code:
 
-> Make a project called *trip* from ~/Movies/trip1.mov and ~/Movies/trip2.mov, cut it by
-> topic into a 2-minute story, and add Hebrew captions.
+> Make a project called *trip* from ~/Movies/trip, cut it by topic into a 2-minute story,
+> and add Hebrew captions.
+
+You don't need to prepare or copy anything. Point at a folder or at files, and the project
+links to them; your originals are never modified. Ask for a copy (`--copy`) when the footage
+is on an external drive or in a cloud folder, or when you plan to move the originals.
 
 ## Layout
 
@@ -67,7 +71,7 @@ projects/<name>/                     your projects: gitignored, never committed
 `tools/vf.py` also works on its own:
 
 ```bash
-python3 tools/vf.py new demo ~/Movies/clip.mp4
+python3 tools/vf.py new demo ~/Movies/trip       # a folder or files; --copy to copy
 python3 tools/vf.py transcribe demo
 python3 tools/vf.py transcript demo        # read it, then write projects/demo/story.json
 python3 tools/vf.py render demo --draft

@@ -59,8 +59,12 @@ claude
 
 ואז ב-Claude Code:
 
-> תעשה פרויקט בשם *trip* מ-‎~/Movies/trip1.mov ומ-‎~/Movies/trip2.mov, תחתוך לפי נושאים
-> לסיפור של שתי דקות ותוסיף כתוביות בעברית.
+> תעשה פרויקט בשם *trip* מהתיקייה ‎~/Movies/trip, תחתוך לפי נושאים לסיפור של שתי דקות
+> ותוסיף כתוביות בעברית.
+
+לא צריך להכין או להעתיק כלום. מספיק להצביע על תיקייה או על קבצים, והפרויקט מקשר
+אליהם. הקבצים המקוריים לא משתנים לעולם. כדאי לבקש העתקה (`‎--copy`) כשהחומר נמצא
+בדיסק חיצוני או בתיקיית ענן, או כשמתכננים להזיז את הקבצים המקוריים.
 
 ## מבנה
 
@@ -80,7 +84,7 @@ projects/<name>/                     הפרויקטים שלך: לא עולים 
 </div>
 
 ```bash
-python3 tools/vf.py new demo ~/Movies/clip.mp4
+python3 tools/vf.py new demo ~/Movies/trip       # a folder or files; --copy to copy
 python3 tools/vf.py transcribe demo
 python3 tools/vf.py transcript demo        # read it, then write projects/demo/story.json
 python3 tools/vf.py render demo --draft

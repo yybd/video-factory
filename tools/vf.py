@@ -5,7 +5,7 @@ The skill (Claude) decides *what* to cut and in what order; this script does the
 deterministic work around that decision:
 
   vf.py doctor                         check ffmpeg-full, ffmpeg-skill, transcription
-  vf.py new <name> <video>...          create projects/<name>/ with the sources linked in
+  vf.py new <name> <video|folder>...   create projects/<name>/ with the sources linked in (--copy to copy)
   vf.py transcribe <project>           Hebrew transcript per source -> transcript/<src>.json
   vf.py transcript <project>           print every transcript as "[src mm:ss.ss-mm:ss.ss] text"
   vf.py scenes <project>               visual scene changes per source (helps snap cuts)
@@ -180,18 +180,56 @@ def cmd_doctor(_a) -> None:
     sys.exit(0 if ok else 1)
 
 
+def expand_inputs(items: list[str]) -> list[Path]:
+    """Files as given; a folder contributes its video files (top level, sorted by name)."""
+    files: list[Path] = []
+    for item in items:
+        p = Path(item).expanduser().resolve()
+        if p.is_dir():
+            found = sorted(f for f in p.iterdir() if f.is_file() and f.suffix.lower() in VIDEO_EXT
+                           and not f.name.startswith("."))
+            if not found:
+                sys.exit(f"no video files in {p} (looked for {', '.join(sorted(VIDEO_EXT))})")
+            files += found
+        elif p.is_file():
+            files.append(p)
+        else:
+            sys.exit(f"not found: {p}")
+    return files
+
+
+def is_cloud_placeholder(p: Path) -> bool:
+    """An iCloud / File Provider file that is not downloaded reads as (almost) empty."""
+    try:
+        st = p.stat()
+    except OSError:
+        return True
+    blocks = getattr(st, "st_blocks", None)
+    return st.st_size > 0 and blocks is not None and blocks == 0
+
+
 def cmd_new(a) -> None:
+    inputs = expand_inputs(a.videos)  # fail before creating anything
     proj = PROJECTS / a.name
     for sub in ("source", "transcript", "parts", "renders"):
         (proj / sub).mkdir(parents=True, exist_ok=True)
-    for v in a.videos:
-        v = Path(v).expanduser().resolve()
-        if not v.exists():
-            sys.exit(f"not found: {v}")
+    for v in inputs:
+        if is_cloud_placeholder(v):
+            sys.exit(f"{v} is a cloud placeholder, not on disk yet — download it (Finder: "
+                     "Download Now) and run again")
         dst = proj / "source" / v.name
-        if not dst.exists():
-            dst.symlink_to(v)  # never copy or touch the original
-        print(f"  source {dst.name} -> {v}")
+        if dst.exists() or dst.is_symlink():
+            same = dst.resolve() == v or (dst.exists() and dst.samefile(v))
+            if not same:
+                sys.exit(f"source/{v.name} already exists and is a different file — rename one of them")
+            print(f"  source {dst.name}: already there")
+            continue
+        if a.copy:
+            shutil.copy2(v, dst)  # for removable drives, cloud folders, or originals about to move
+            print(f"  source {dst.name}: copied from {v}")
+        else:
+            dst.symlink_to(v)  # default: no duplicate footage; the original is never written to
+            print(f"  source {dst.name} -> {v}")
     print(proj)
 
 
@@ -348,7 +386,12 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("doctor").set_defaults(fn=cmd_doctor)
-    p = sub.add_parser("new"); p.add_argument("name"); p.add_argument("videos", nargs="+"); p.set_defaults(fn=cmd_new)
+    p = sub.add_parser("new", help="create a project from video files and/or folders of videos")
+    p.add_argument("name"); p.add_argument("videos", nargs="+", help="video files or folders")
+    p.add_argument("--copy", action="store_true",
+                   help="copy the sources in instead of linking (external drive, cloud folder, "
+                        "or originals you will move)")
+    p.set_defaults(fn=cmd_new)
     p = sub.add_parser("transcribe"); p.add_argument("project"); p.add_argument("--language", default="he")
     p.add_argument("--prompt", default=""); p.add_argument("--presets", default="")
     p.add_argument("--force", action="store_true"); p.set_defaults(fn=cmd_transcribe)
