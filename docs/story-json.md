@@ -43,7 +43,7 @@ reads it. All times are in seconds.
 | `title` | — | shown on the review page |
 | `output` | size of the first footage part's source as displayed (rotation applied), 30 fps (29.97 etc. allowed) | `width`, `height`, `fps` of the result |
 | `fit` | `pad` | how sources of another shape reach the output: `pad` (bars) or `crop` |
-| `transition` | `fade`, 0.5 | `type` and `duration` for every junction |
+| `transition` | `fade`, 0.5 | default `type` and `duration` at every junction (a part can override its own, see Transitions) |
 | `parts` | required | the edit, in order |
 | `overlays` | — | graphics on top of the edit |
 | `broll` | — | cutaways over the edit |
@@ -70,6 +70,7 @@ A part is either **footage** or **motion**.
 | `clean` | `[]` | `"fillers"` (hesitation sounds from `tools/fillers.<lang>.txt`), `"pauses"` |
 | `max_pause` | `0.6` | with `pauses`: every silence longer than this shrinks to this |
 | `captions` | `true` | `false` = no captions over this part |
+| `transition` | story's | the transition **into** this part: `{"type", "duration"}` |
 | `title`, `why` | — | for people: what it is and why it is there |
 
 ### Motion part
@@ -77,6 +78,30 @@ A part is either **footage** or **motion**.
 `{"id": "...", "motion": {"template": "<name>", "vars": {...}, "duration": s, "logo": true}}`, a
 full-screen graphic rendered at the output size. Templates and their variables:
 [Motion graphics](motion-graphics.md).
+
+## Transitions
+
+The story's `transition` is the default at every junction. A part can set its own **incoming**
+transition, so each junction can differ:
+
+```json
+"transition": {"type": "fade", "duration": 0.5},
+"parts": [
+  {"id": "intro", "motion": {"template": "title", "vars": {"title": "…"}}},
+  {"id": "ceo", "source": "interview", "start": 12, "end": 30, "transition": {"type": "dissolve", "duration": 0.6}},
+  {"id": "demo", "source": "screen", "start": 0, "end": 8, "transition": {"type": "none"}},
+  {"id": "chart", "motion": {"template": "bar-chart"}, "transition": {"type": "zoomin", "duration": 0.5}},
+  {"id": "outro", "motion": {"template": "end-card"}, "transition": {"type": "fadeblack", "duration": 0.8}}
+]
+```
+
+Every type FFmpeg's xfade knows is accepted (validation lists what your FFmpeg has):
+
+`fade fadefast fadeslow fadeblack fadewhite fadegrays dissolve pixelize distance hblur · wipeleft wiperight wipeup wipedown wipetl wipetr wipebl wipebr · slideleft slideright slideup slidedown · smoothleft smoothright smoothup smoothdown · coverleft coverright coverup coverdown · revealleft revealright revealup revealdown · circleopen circleclose circlecrop rectcrop radial · vertopen vertclose horzopen horzclose · diagtl diagtr diagbl diagbr · hlslice hrslice vuslice vdslice · hlwind hrwind vuwind vdwind · squeezeh squeezev zoomin · none`
+
+Rules of thumb: within a topic `fade` 0.3–0.5 s or `none`; a new topic `fadeblack` 0.6–1 s; into a
+graphic `zoomin`, `slideleft` or `circleopen`; a montage `none` or `dissolve`. A part must be longer
+than its incoming plus outgoing transitions; validation says which part is too short.
 
 ## Overlays
 

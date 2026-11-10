@@ -84,6 +84,38 @@
 גרפיקה במסך מלא שמרונדרת בגודל הפלט. התבניות והמשתנים שלהן:
 [גרפיקה בתנועה](motion-graphics.he.md).
 
+## מעברים
+
+ה-`transition` של הסיפור הוא ברירת המחדל בכל נקודת חיבור. כל חלק יכול להגדיר מעבר **נכנס** משלו,
+כך שכל חיבור יכול להיות שונה. דוגמה:
+
+</div>
+
+```json
+"transition": {"type": "fade", "duration": 0.5},
+"parts": [
+  {"id": "intro", "motion": {"template": "title", "vars": {"title": "…"}}},
+  {"id": "ceo", "source": "interview", "start": 12, "end": 30, "transition": {"type": "dissolve", "duration": 0.6}},
+  {"id": "demo", "source": "screen", "start": 0, "end": 8, "transition": {"type": "none"}},
+  {"id": "chart", "motion": {"template": "bar-chart"}, "transition": {"type": "zoomin", "duration": 0.5}},
+  {"id": "outro", "motion": {"template": "end-card"}, "transition": {"type": "fadeblack", "duration": 0.8}}
+]
+```
+
+<div dir="rtl">
+
+כל סוג ש-xfade של FFmpeg מכיר מתקבל (הבדיקה מראש מציגה מה יש ב-FFmpeg שלכם):
+
+</div>
+
+`fade fadefast fadeslow fadeblack fadewhite fadegrays dissolve pixelize distance hblur · wipeleft wiperight wipeup wipedown wipetl wipetr wipebl wipebr · slideleft slideright slideup slidedown · smoothleft smoothright smoothup smoothdown · coverleft coverright coverup coverdown · revealleft revealright revealup revealdown · circleopen circleclose circlecrop rectcrop radial · vertopen vertclose horzopen horzclose · diagtl diagtr diagbl diagbr · hlslice hrslice vuslice vdslice · hlwind hrwind vuwind vdwind · squeezeh squeezev zoomin · none`
+
+<div dir="rtl">
+
+כללי אצבע: בתוך נושא, `fade` של 0.3–0.5 שנ׳ או `none`. נושא חדש, `fadeblack` של 0.6–1 שנ׳. כניסה
+לגרפיקה, `zoomin`, `slideleft` או `circleopen`. מונטאז׳, `none` או `dissolve`. חלק צריך להיות ארוך
+מסכום המעבר הנכנס והיוצא שלו, והבדיקה מראש אומרת איזה חלק קצר מדי.
+
 ## שכבות עליונות
 
 כל שכבה עליונה ממוקמת לפי `{"part": id, "at": seconds into that part}` (שניות מתחילת אותו חלק)

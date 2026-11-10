@@ -27,7 +27,8 @@ The **video-orchestrator** skill conducts the whole production, in two modes:
   Or cut at **exact seconds**.
 - **Build a story** with a reason for each part, and **wait for your approval**.
 - **Clean** hesitation sounds (אממ, אה) and long pauses; captions follow the cuts.
-- **Join with transitions** (fade, fade-to-black, dissolve, wipes, slides…).
+- **Join with transitions**: a different one at each junction if you like, from about 60 types
+  (dissolve, fade-to-black, wipes, slides, zoom, circle, pixelize…).
 
 **Promo layer**
 - **Brand kit**: colours, logo and font applied to captions and every graphic.
@@ -43,7 +44,11 @@ The **video-orchestrator** skill conducts the whole production, in two modes:
 - **Captions** re-timed onto the final edit, right-to-left, optional karaoke, plus
   **second-language subtitles** (toggleable or burned).
 - **Versions** from one story: vertical for Reels, 30 s, 15 s.
-- **Client review page**: the client leaves notes at moments, and Claude applies them.
+- **Shorts from a long video**: candidate moments from the transcript, Claude picks, and each
+  renders vertical with word-by-word captions and a hook title.
+- **Review page with a visual timeline**, with no server and no editing app: every track, drag to
+  reorder, change any transition, timecoded notes, in English or Hebrew. The client's changes come
+  back as text that Claude applies.
 - **Editor timeline** export (Final Cut / Resolve / Premiere) and **platform checks**.
 - **Pre-production**: brief, shot list and interview questions before filming, and a coverage
   check after.
@@ -51,6 +56,24 @@ The **video-orchestrator** skill conducts the whole production, in two modes:
 Everything else (loudness, audio clean-up, speed ramps, stabilisation, redaction, chapters,
 platform exports) comes from the vendored [ffmpeg-skill](https://github.com/kajisho5/ffmpeg-skill)
 (42 tools, MIT).
+
+## Why video-factory
+
+- **Hebrew, end to end, on your machine.** Word-level Hebrew transcription (ivrit.ai), right-to-left
+  captions in the right order, karaoke, and fillers like אממ removed with captions re-timed. Descript and
+  OpusClip don't support Hebrew; Premiere and Resolve can't transcribe it.
+- **It decides like an editor, and asks before acting.** Parts by meaning, a story with a reason for
+  every part, your approval before rendering, and a QA check after.
+- **Promo-grade, not just cuts.** Brand, Hebrew motion graphics and infographics, b-roll matched to the
+  words, music under speech, narration from a script, versions and shorts, all from one edit.
+- **Hand-off both ways.** A review page anyone can open, and an FCPXML / EDL / OTIO timeline for
+  Premiere, Resolve or Final Cut. No other agent tool surveyed has either.
+- **Show, don't describe.** Give it a video you like, and it measures the pace and reads the transitions.
+- **Open and private.** MIT, local (only TTS is in the cloud, and only if you choose it), no account.
+
+Where it is weaker (no GUI editor, no AI-generated footage or avatars, no stock library) and how it
+compares with OpenMontage, video-use, Kinocut, Descript, OpusClip and others:
+[docs/comparison.md](docs/comparison.md).
 
 ## Requirements
 
@@ -158,6 +181,8 @@ and tells you which.
 | "Longer transition, one second" | sets its duration |
 | "Wipe" / "slide" / "circle" | `wipeleft`, `slideleft`, `circleopen` and the rest |
 | "Straight cuts, no transitions" | `none` |
+| "Dissolve into the interview, zoom into the chart, fade to black before the end" | a different transition at each junction |
+| "Use transitions like in this clip" (a file) | reads them from the clip and sets each junction |
 
 ### Captions
 
@@ -230,9 +255,18 @@ and tells you which.
 |---|---|
 | "A vertical version for Reels" / "a 15-second cut" | `versions` in the story, rendered from the same edit |
 | "English subtitles too" / "burned in" | translated subtitle track (toggleable) or burned at the top |
-| "Make a review page for the client" | page where the client leaves notes at moments |
+| "Make a review page for the client" / "…in English" | timeline + notes page; the client can also reorder parts and change transitions |
 | "Here are the client's notes: …" | each note mapped to a part and applied |
 | "Send it to my editor in Premiere / Resolve" | FCPXML / EDL timeline of the cut |
+
+### Shorts from a long video
+
+| Ask | What happens |
+|---|---|
+| "Find the best moments for Reels in this interview" | ranked candidates from the transcript; Claude picks and explains |
+| "Make 5 shorts of 30–45 seconds" | `clips.json`, each with a hook title |
+| "Render them, with our logo and an end card" | vertical clips with word-by-word captions, cleaned, QA-checked |
+| "The hook of clip 3 is weak, change it" | edits that clip and re-renders it alone |
 
 ### Polishing the result (ffmpeg-skill tools)
 
@@ -304,7 +338,6 @@ See [docs/comparison.md](docs/comparison.md).
 
 ## Current limitations
 
-- One transition type for the whole video.
 - Karaoke highlights a word from the end of the previous word until its own end, so the
   highlight leads the voice slightly.
 - The API voice-over providers follow each provider's documented API but have not yet been run

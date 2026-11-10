@@ -48,6 +48,18 @@ Only changed beats are re-voiced.
 At any point, `vf.py status` shows where every project stands and the next step. Every render
 ends with an automatic QA check (length, size, streams, captions).
 
+## Showing it examples
+
+You don't have to describe a style in words. Show it.
+
+| You have | What to do | What happens |
+|---|---|---|
+| A video file you want to imitate (an ad, a competitor's promo, a reel) | "Make ours feel like this" + the path | `vf.py reference <name> <file>` measures its pace (median shot length, cuts per minute), and writes sheets of the whole video plus `transitions.png`: three frames around each cut, which show whether it is a hard cut, a dissolve, a wipe or a flash. Claude writes `reference/<file>/style.md` and applies it: part lengths, the transition at each junction, caption look, graphics. It tells you what it could not match. |
+| A clip of transitions you like | "Use transitions like these" | the same `reference` sheet. Claude maps each one to the closest of about 60 transition types and sets them per junction. |
+| A link (YouTube, Instagram) | download it first: the `/watch` plugin, or `yt-dlp` | then as above. Client footage is never sent to a cloud model. |
+| A graphic style the templates don't have (a specific lower third, kinetic type) | "Make the titles look like this" | Claude builds a custom HyperFrames composition in `projects/<name>/motion/`. `/reverse-any-video` can rebuild a whole reference as an editable composition. |
+| Your previous video | "Same style as the last one" | Claude reads that project's `story.json` and `brand.json` and reuses them. |
+
 ## What the render does, in order
 
 1. **Parts**: footage parts are cut frame-accurately, with fillers and pauses removed when asked

@@ -32,23 +32,67 @@ skipped.
 `top` by default, so it does not cover the Hebrew). The render reports cues that have no
 translation.
 
-## Client review
+## Review page: timeline and client notes
 
 ```bash
 python3 tools/vf.py review <name>                 # renders/final_review.html
-python3 tools/vf.py review <name> --version reels
+python3 tools/vf.py review <name> --draft         # the draft
+python3 tools/vf.py review <name> --version reels --lang en
 ```
 
-The page sits next to the video and plays it. The client pauses on a moment, types a note and
-adds it. Notes stay in that browser. "Copy" or "Save as file" gives text like:
+One static HTML file next to the video. It needs **no server**: open it by double-click, or send it
+with the video. The edit's tracks are embedded in it from `renders/<render>.timeline.json`, which
+every render writes.
+
+- **Visual timeline**: parts (footage and graphics in different colours) with a label at each
+  junction showing its transition, then overlays, b-roll, captions and audio, each in its own
+  lane. A playhead follows the video, a click anywhere jumps there, and the zoom slider widens it.
+- **Changes**: drag a part to reorder it; click a transition label to pick another type and length
+  (every type your FFmpeg has); click a part to see its source range, length and why it is there.
+- **Notes**: pause on a moment, type, add. A click on a note's time jumps back to it.
+- **Send to the editor**: everything (new order, changed transitions, notes) becomes one text, to
+  copy or save:
 
 ```
+# ACME — promo — final.mp4
+order: intro, chart, hello, how, outro
+transition into chart: circleopen 0.7s
 0:03.2 — הלוגו גדול מדי
 0:12.4 — לקצר את התשובה הראשונה
 ```
 
-Send the client the `renders/` folder (or the video and the page together). Paste the returned
-notes to Claude, who maps each time to a part and changes `story.json`.
+Notes and changes are kept in that browser only; a page cannot write back to your disk without a
+server. Paste the text to Claude, who applies it to `story.json` and renders again. The page has an
+English / Hebrew toggle (`--lang` sets where it starts).
+
+## Shorts from a long video
+
+Turn an interview, a lecture or a podcast into vertical clips:
+
+1. `python3 tools/vf.py candidates <name>` ranks windows of 15–60 s that could stand alone (a hook up
+   front, numbers, pace, a complete ending) and writes their full text to `candidates.json`.
+2. Claude reads them and picks: a clip must make sense with no context, open on its strongest line,
+   and end on a payoff. It writes `clips.json` with a short hook title for each.
+3. `python3 tools/vf.py clips <name>` renders every clip.
+
+```json
+{
+  "style": {"width": 1080, "height": 1920, "fit": "crop", "karaoke_style": "word",
+            "caption_size": 24, "hook_seconds": 2.5, "hook_place": "top",
+            "end_card": {"vars": {"cta": "לכל הפרק", "line1": "youtube.com/@acme"}, "duration": 2.5},
+            "music": {"file": "music/bed.mp3", "volume": -26}},
+  "clips": [
+    {"id": "c1", "source": "interview", "start": 312.4, "end": 351.0, "hook": "הטעות שכולם עושים", "why": "…"},
+    {"id": "c2", "source": "interview", "start": 1204.0, "end": 1238.5, "hook": "3 דברים שלמדתי"}
+  ],
+  "cues": [{"id": "interview:41", "text": "corrected line"}]
+}
+```
+
+Each clip is cleaned (fillers, pauses down to 0.4 s), cropped to 9:16, captioned word by word,
+gets the hook title in the top third for its first seconds, the logo (from `brand.json`), loudness
+−14 LUFS, and the end card if given. Output: `renders/clip_<id>.mp4`, each checked by QA.
+`--only c2` re-renders one; `--draft` for quick previews.
 
 ## Editor timelines
 

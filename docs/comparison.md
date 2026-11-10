@@ -37,7 +37,12 @@ Hebrew video. Pricing and star counts change often. Hebrew support is what each 
    other agent tool surveyed exports FCPXML.
 6. **Footage-led and script-led in one project**: interview-driven promos and narrated product
    videos share the same pipeline, brand, graphics and delivery.
-7. **A plain MIT licence**, against AGPL (OpenMontage) or company-size limits (Remotion).
+7. **Hebrew shorts from long videos**: candidate moments from the Hebrew transcript, judged by Claude,
+   rendered vertical with word-by-word captions and a hook title. OpusClip, the market leader,
+   does not support Hebrew.
+8. **A visual timeline without an editor app**: one static page with the video, every track, drag
+   to reorder, transitions per junction, and notes.
+9. **A plain MIT licence**, against AGPL (OpenMontage) or company-size limits (Remotion).
 
 ## Where it is weaker, and who does it better
 
@@ -47,19 +52,18 @@ Hebrew video. Pricing and star counts change often. Hebrew support is what each 
 | Needs Claude Code and a CLI install | browser tools: Submagic, VEED, Kapwing |
 | No AI image / video generation, no avatars or lip-sync | OpenMontage, Runway, HeyGen, Synthesia |
 | No stock footage search | OpenMontage (Pexels, Archive.org, NASA), Pictory |
-| One transition type per video; no light leaks or whip pans | claude-code-video-toolkit, Kinocut |
+| No light leaks or whip pans among the ~60 transitions (per junction since 2026-11) | claude-code-video-toolkit |
 | Voice-over: paid providers untested here, no free local Hebrew TTS | OpenMontage (Piper offline), claude-code-video-toolkit (voice cloning) |
-| No automatic "best moments" clipping of long videos | OpusClip, Riverside Magic Clips |
+| "Best moments" clipping is Claude-judged, not a trained virality model | OpusClip, Riverside Magic Clips (no Hebrew) |
 | No direct publishing to platforms | video-editing-skill (WoopSocial) |
 
 ## Ideas worth taking
 
 1. An automatic **QA gate** after every render (duration, streams, loudness, captions present),
    blocking a bad file from being reported as done.
-2. **More transitions** through HyperFrames' registry (light leak, zoom blur, whip pan),
-   chosen per junction.
-3. A **long-video-to-clips** mode that scores moments in the Hebrew transcript. This is an open
-   space, because OpusClip does not support Hebrew.
+2. **Shader transitions** through HyperFrames' registry (light leak, zoom blur, whip pan) on top of
+   the ~60 per-junction types.
+3. **Audio energy and laughter** in the clip scoring, alongside the transcript signals.
 4. A **free local Hebrew TTS**, if a good open voice appears, so narration also stays local.
 5. **Free stock search** (Pexels, Wikimedia) to fill b-roll gaps.
 6. A public **Hebrew benchmark**: transcription accuracy and screenshots of mixed

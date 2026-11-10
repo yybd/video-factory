@@ -92,8 +92,23 @@ Narration from `script.md`; see [Voice-over](voiceover.md).
 Tempo, beat count and the start of every bar, so parts can be cut on the music. The full grid is
 written to `renders/<music>.beats.json`.
 
-## review `<project> [--version V]`
-Writes `renders/<V or final>_review.html` next to the video. See [Delivery](delivery.md).
+## review `<project> [--version V] [--draft] [--lang he|en]`
+Writes `renders/<render>_review.html` next to the video: one static page, no server. It has the video, a
+**visual timeline** (parts and transitions, overlays, b-roll, captions, audio, with a playhead), and
+timecoded notes. On the timeline, parts can be dragged into a new order and any transition changed.
+Everything leaves as one text request for the editor. `--lang` sets the starting language; the page
+has an English / Hebrew toggle. See [Delivery](delivery.md).
+
+## candidates `<project> [--min 15] [--max 60] [--top 12]`
+Finds moments that could stand alone as a short. It looks at windows of whole transcript segments and
+scores them on a hook in the first sentence (a question, a number, strong words), numbers, pace,
+fillers, and a complete ending. It prints a ranked shortlist and writes `candidates.json` with each
+moment's full text. The score is a pointer: Claude reads the text and decides.
+
+## clips `<project> [--only c1,c3] [--draft]`
+Renders `clips.json` (see [Delivery](delivery.md#shorts-from-a-long-video)) as shorts:
+`renders/clip_<id>.mp4`, vertical by default, cleaned, with word-by-word captions, a hook title over
+the first seconds, the logo, and an optional end card. Each clip passes the QA check.
 
 ## export `<project> [--format fcpxml|edl|otio] [--version V]`
 The edit as an editor timeline in `renders/edit.<format>`, pointing at the original files. Motion
