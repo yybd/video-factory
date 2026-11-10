@@ -1,0 +1,72 @@
+<!doctype html>
+<!--
+  video-factory motion template: one big number that counts up, with a label ("+40% מכירות").
+  Transparent by default (sits over footage); "opaque": true gives it a full brand background.
+  vf.py sets the length by rewriting every data-duration marked data-vf-dur.
+-->
+<html lang="he" dir="rtl"
+  data-composition-variables='[
+    {"id":"value","type":"number","label":"Number","default":40},
+    {"id":"decimals","type":"number","label":"Decimals","default":0},
+    {"id":"prefix","type":"string","label":"Before the number","default":"+"},
+    {"id":"suffix","type":"string","label":"After the number","default":"%"},
+    {"id":"label","type":"string","label":"Label","default":"גידול במכירות"},
+    {"id":"accent","type":"color","label":"Accent","default":"#FFD200"},
+    {"id":"ink","type":"color","label":"Text","default":"#FFFFFF"},
+    {"id":"panel","type":"color","label":"Background","default":"#101418"},
+    {"id":"opaque","type":"boolean","label":"Solid background","default":false},
+    {"id":"position","type":"enum","label":"Position","default":"center","options":[{"value":"center","label":"Center"},{"value":"right","label":"Right third"},{"value":"left","label":"Left third"}]}
+  ]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+    <style>
+      @font-face { font-family: "VF Hebrew"; src: local("Heebo"), local("Assistant"), local("Arial Hebrew"), local("Noto Sans Hebrew"), local("Arial"); }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; font-family: "VF Hebrew", sans-serif; }
+      #bg { position: absolute; inset: 0; background: var(--panel); display: none; }
+      #root.solid #bg { display: block; }
+      #box { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; }
+      #root.right #box { left: 75%; }
+      #root.left #box { left: 25%; }
+      #num { color: var(--accent); font-size: 260px; font-weight: 900; line-height: 1; direction: ltr;
+             font-variant-numeric: tabular-nums; text-shadow: 0 8px 40px rgba(0,0,0,0.45); white-space: nowrap; }
+      #label { color: var(--ink); font-size: 64px; font-weight: 700; margin-top: 18px;
+               text-shadow: 0 4px 24px rgba(0,0,0,0.6); white-space: nowrap; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="4" data-vf-dur
+         data-width="1920" data-height="1080">
+      <div id="card" class="clip" data-start="0" data-duration="4" data-vf-dur data-track-index="0">
+        <div id="bg"></div>
+        <div id="box">
+          <div id="num">+40%</div>
+          <div id="label" data-var-text="label">גידול במכירות</div>
+        </div>
+      </div>
+    </div>
+    <script>
+      const v = Object.assign({ value: 40, decimals: 0, prefix: "+", suffix: "%" },
+        (window.__hyperframes && window.__hyperframes.getVariables && window.__hyperframes.getVariables()) || {});
+      const root = document.getElementById("root");
+      if (v.opaque) root.classList.add("solid");
+      if (v.position === "right" || v.position === "left") root.classList.add(v.position);
+      const D = parseFloat(root.dataset.duration);
+      const num = document.getElementById("num");
+      const fmt = (x) => v.prefix + Number(x).toLocaleString("en-US", { minimumFractionDigits: v.decimals, maximumFractionDigits: v.decimals }) + v.suffix;
+      const counter = { x: 0 };
+      num.textContent = fmt(0);
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo("#box", { opacity: 0, scale: 0.85 }, { opacity: 1, scale: 1, duration: 0.5, ease: "back.out(1.7)" }, 0)
+        .to(counter, { x: Number(v.value), duration: Math.min(1.6, D * 0.45), ease: "power2.out",
+                       onUpdate: () => { num.textContent = fmt(counter.x); } }, 0.15)
+        .fromTo("#label", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.45, ease: "power2.out" }, 0.5)
+        .to("#box", { opacity: 0, scale: 0.95, duration: 0.4, ease: "power2.in" }, D - 0.45);
+      window.__timelines["main"] = tl;
+      tl.seek(0);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,70 @@
+<!doctype html>
+<!--
+  video-factory motion template: end card — logo, call to action, contact lines.
+  vf.py copies the brand logo to assets/logo.png and puts an <img id="logo"> where VF_LOGO is.
+  vf.py sets the length by rewriting every data-duration marked data-vf-dur.
+-->
+<html lang="he" dir="rtl"
+  data-composition-variables='[
+    {"id":"cta","type":"string","label":"Call to action","default":"דברו איתנו היום"},
+    {"id":"line1","type":"string","label":"Line 1 (website)","default":"www.example.co.il"},
+    {"id":"line2","type":"string","label":"Line 2 (phone)","default":"03-1234567"},
+    {"id":"line3","type":"string","label":"Line 3","default":""},
+    {"id":"accent","type":"color","label":"Accent","default":"#FFD200"},
+    {"id":"ink","type":"color","label":"Text","default":"#FFFFFF"},
+    {"id":"panel","type":"color","label":"Background","default":"#101418"},
+    {"id":"has_logo","type":"boolean","label":"Show logo","default":false}
+  ]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+    <style>
+      @font-face { font-family: "VF Hebrew"; src: local("Heebo"), local("Assistant"), local("Arial Hebrew"), local("Noto Sans Hebrew"), local("Arial"); }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; font-family: "VF Hebrew", sans-serif; }
+      #bg { position: absolute; inset: 0; background: var(--panel); }
+      #glow { position: absolute; width: 1400px; height: 1400px; border-radius: 50%; left: 260px; top: -160px;
+              background: radial-gradient(circle, color-mix(in srgb, var(--accent) 22%, transparent) 0%, transparent 60%); }
+      #stack { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+      #logo { max-width: 520px; max-height: 260px; margin-bottom: 56px; display: none; }
+      #root.logo #logo { display: block; }
+      #cta { color: var(--ink); font-size: 104px; font-weight: 800; line-height: 1.1; }
+      #rule { width: 180px; height: 8px; background: var(--accent); margin: 40px 0 36px; }
+      .line { color: var(--ink); opacity: 0.9; font-size: 52px; line-height: 1.5; direction: ltr; unicode-bidi: plaintext; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="5" data-vf-dur
+         data-width="1920" data-height="1080">
+      <div id="card" class="clip" data-start="0" data-duration="5" data-vf-dur data-track-index="0">
+        <div id="bg"></div>
+        <div id="glow"></div>
+        <div id="stack">
+          <!--VF_LOGO-->
+          <div id="cta" data-var-text="cta">דברו איתנו היום</div>
+          <div id="rule"></div>
+          <div id="l1" class="line" data-var-text="line1">www.example.co.il</div>
+          <div id="l2" class="line" data-var-text="line2">03-1234567</div>
+          <div id="l3" class="line" data-var-text="line3"></div>
+        </div>
+      </div>
+    </div>
+    <script>
+      const v = (window.__hyperframes && window.__hyperframes.getVariables && window.__hyperframes.getVariables()) || {};
+      const root = document.getElementById("root");
+      if (v.has_logo) root.classList.add("logo");
+      const D = parseFloat(root.dataset.duration);
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo("#glow", { scale: 0.8, opacity: 0 }, { scale: 1, opacity: 1, duration: 1.2, ease: "power2.out" }, 0)
+        .fromTo("#logo", { opacity: 0, scale: 0.9 }, { opacity: 1, scale: 1, duration: 0.6, ease: "back.out(1.6)" }, 0.15)
+        .fromTo("#cta", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 0.35)
+        .fromTo("#rule", { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: "power3.inOut" }, 0.6)
+        .fromTo(".line", { opacity: 0, y: 18 }, { opacity: 0.9, y: 0, duration: 0.45, stagger: 0.12, ease: "power2.out" }, 0.75)
+        .fromTo("#glow", { x: 0 }, { x: -120, duration: D, ease: "none" }, 0);
+      window.__timelines["main"] = tl;
+      tl.seek(0);
+    </script>
+  </body>
+</html>

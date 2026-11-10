@@ -1,0 +1,93 @@
+<!doctype html>
+<!--
+  video-factory motion template: animated bar chart (infographic), right-to-left.
+  "items" is a JSON string: [{"label":"2023","value":120},{"label":"2024","value":180}] (up to 8).
+  vf.py sets the length by rewriting every data-duration marked data-vf-dur.
+-->
+<html lang="he" dir="rtl"
+  data-composition-variables='[
+    {"id":"title","type":"string","label":"Title","default":"הכנסות לפי שנה"},
+    {"id":"items","type":"string","label":"Items (JSON)","default":"[{\"label\":\"2022\",\"value\":80},{\"label\":\"2023\",\"value\":120},{\"label\":\"2024\",\"value\":175},{\"label\":\"2025\",\"value\":240}]"},
+    {"id":"unit","type":"string","label":"Unit after values","default":""},
+    {"id":"highlight","type":"number","label":"Highlighted bar (1-based, 0 = last)","default":0},
+    {"id":"source","type":"string","label":"Source note","default":""},
+    {"id":"accent","type":"color","label":"Accent","default":"#FFD200"},
+    {"id":"ink","type":"color","label":"Text","default":"#FFFFFF"},
+    {"id":"panel","type":"color","label":"Background","default":"#101418"},
+    {"id":"opaque","type":"boolean","label":"Solid background","default":true}
+  ]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+    <style>
+      @font-face { font-family: "VF Hebrew"; src: local("Heebo"), local("Assistant"), local("Arial Hebrew"), local("Noto Sans Hebrew"), local("Arial"); }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
+      #root { position: relative; width: 100%; height: 100%; font-family: "VF Hebrew", sans-serif; }
+      #bg { position: absolute; inset: 0; background: var(--panel); }
+      #root.clear #bg { background: color-mix(in srgb, var(--panel) 70%, transparent); }
+      #title { position: absolute; top: 110px; right: 160px; left: 160px; color: var(--ink); font-size: 76px; font-weight: 800; }
+      #chart { position: absolute; right: 160px; left: 160px; top: 260px; bottom: 170px;
+               display: flex; flex-direction: row; align-items: flex-end; justify-content: space-around; gap: 40px;
+               border-bottom: 4px solid color-mix(in srgb, var(--ink) 35%, transparent); }
+      .col { flex: 1; max-width: 260px; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
+      .val { color: var(--ink); font-size: 50px; font-weight: 800; margin-bottom: 14px; direction: ltr; white-space: nowrap; }
+      .bar { width: 100%; background: color-mix(in srgb, var(--ink) 55%, transparent); border-radius: 10px 10px 0 0; }
+      .col.hi .bar { background: var(--accent); }
+      .col.hi .val { color: var(--accent); }
+      .lab { position: absolute; bottom: 100px; color: var(--ink); opacity: 0.85; font-size: 40px; }
+      #labels { position: absolute; right: 160px; left: 160px; bottom: 100px; display: flex; justify-content: space-around; gap: 40px; }
+      #labels div { flex: 1; max-width: 260px; text-align: center; color: var(--ink); opacity: 0.85; font-size: 40px; white-space: nowrap; }
+      #source { position: absolute; bottom: 40px; right: 160px; color: var(--ink); opacity: 0.55; font-size: 26px; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-vf-dur
+         data-width="1920" data-height="1080">
+      <div id="card" class="clip" data-start="0" data-duration="6" data-vf-dur data-track-index="0">
+        <div id="bg"></div>
+        <div id="title" data-var-text="title">הכנסות לפי שנה</div>
+        <div id="chart"></div>
+        <div id="labels"></div>
+        <div id="source" data-var-text="source"></div>
+      </div>
+    </div>
+    <script>
+      const v = (window.__hyperframes && window.__hyperframes.getVariables && window.__hyperframes.getVariables()) || {};
+      const root = document.getElementById("root");
+      if (v.opaque === false) root.classList.add("clear");
+      const D = parseFloat(root.dataset.duration);
+      let items = [];
+      const DEFAULT_ITEMS = '[{"label":"2022","value":80},{"label":"2023","value":120},{"label":"2024","value":175},{"label":"2025","value":240}]';
+      try { items = JSON.parse(v.items || DEFAULT_ITEMS); } catch (e) { items = JSON.parse(DEFAULT_ITEMS); }
+      items = items.slice(0, 8);
+      const max = Math.max(1, ...items.map((i) => Number(i.value) || 0));
+      const hi = Number(v.highlight || 0) || items.length;
+      const unit = v.unit || "";
+      const chart = document.getElementById("chart"), labels = document.getElementById("labels");
+      const counters = [];
+      items.forEach((it, k) => {
+        const col = document.createElement("div"); col.className = "col" + (k + 1 === hi ? " hi" : "");
+        const val = document.createElement("div"); val.className = "val"; val.textContent = "0" + unit;
+        const bar = document.createElement("div"); bar.className = "bar"; bar.style.height = (Number(it.value) / max * 100) + "%";
+        col.appendChild(val); col.appendChild(bar); chart.appendChild(col);
+        const lab = document.createElement("div"); lab.textContent = it.label; labels.appendChild(lab);
+        counters.push({ el: val, bar, to: Number(it.value) || 0, c: { x: 0 } });
+      });
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo("#title", { opacity: 0, y: -24 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.05)
+        .fromTo("#labels div", { opacity: 0 }, { opacity: 0.85, duration: 0.4, stagger: 0.06 }, 0.3);
+      counters.forEach((c, k) => {
+        const t0 = 0.45 + k * 0.18;
+        tl.fromTo(c.bar, { scaleY: 0 }, { scaleY: 1, transformOrigin: "50% 100%", duration: 0.8, ease: "power3.out" }, t0)
+          .to(c.c, { x: c.to, duration: 0.8, ease: "power3.out",
+                     onUpdate: () => { c.el.textContent = Math.round(c.c.x).toLocaleString("en-US") + unit; } }, t0);
+      });
+      tl.fromTo("#source", { opacity: 0 }, { opacity: 0.55, duration: 0.4 }, 1.2)
+        .to("#card > *", { opacity: 0, duration: 0.4, ease: "power2.in" }, D - 0.45);
+      window.__timelines["main"] = tl;
+      tl.seek(0);
+    </script>
+  </body>
+</html>
