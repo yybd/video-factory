@@ -34,7 +34,6 @@ python3 tools/vf.py doctor
 | `VF_WHISPER_MODEL` | מודל ivrit.ai במטמון של Hugging Face | נתיב לכל מודל ggml של whisper.cpp |
 | `VF_WHISPER_DTW` | לפי שם המודל | תצורת יישור DTW, אם השם לא מציין אותה (`large.v3`, `large.v3.turbo`, …) |
 | `VF_FFMPEG_BIN` | ה-ffmpeg-full של Homebrew | התיקייה שמכילה `ffmpeg` ו-`ffprobe` עם libass |
-| `VF_LOCAL_MODELS` | — | גיבוי אופציונלי: פרויקט local-models עם `local-models transcribe` (תזמון ברמת משפט בלבד) |
 | `HYPERFRAMES_NO_TELEMETRY` | `1` (מוגדר ב-`.claude/settings.json`) | מונע מ-HyperFrames לשלוח אירועי שימוש |
 | `ELEVENLABS_API_KEY`, `AZURE_SPEECH_KEY` + `AZURE_SPEECH_REGION`, `GOOGLE_TTS_API_KEY`, `OPENAI_API_KEY` | — | ספקי קריינות; ראו [קריינות](voiceover.he.md) |
 

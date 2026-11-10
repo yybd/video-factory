@@ -11,5 +11,6 @@
 | [Motion graphics](motion-graphics.md) | Built-in templates and their variables, brand, custom HyperFrames graphics |
 | [Voice-over](voiceover.md) | Script format, TTS providers, timing visuals to the voice |
 | [Delivery](delivery.md) | Versions, second-language subtitles, client review, editor timelines, platform checks |
+| [How it compares](comparison.md) | The landscape of agent and commercial video tools, what this does that others don't, and its gaps |
 
 Start with the main [README](../README.md) for what the project does and what you can ask for.

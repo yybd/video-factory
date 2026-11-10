@@ -196,6 +196,8 @@ claude
 | "תעזור לי לתכנן סרטון תדמית ל-X" | תדריך: מטרה, קהל, מסר אחד, קריאה לפעולה, אורך |
 | "מה לצלם?" / "שאלות לראיון עם המנכ״ל" | רשימת צילומים ושאלות שמפיקות ציטוטים טובים |
 | "צילמתי הכול?" | משווה את החומר והתמלול לרשימת הצילומים |
+| "שיהיה כמו הפרסומת הזו" (קובץ) / "אני אוהב את המעברים האלה" (קטע) | לומד את הקצב, המעברים, הכתוביות והגרפיקה שלו, ומחיל אותם על העריכה שלכם |
+| "איפה אנחנו?" / "מה הלאה?" | `status`: מה נעשה בכל פרויקט ומה הצעד הבא |
 
 ### מיתוג וגרפיקה מונפשת
 
@@ -286,6 +288,8 @@ python3 tools/vf.py render demo --draft
 python3 tools/vf.py render demo --version reels
 python3 tools/vf.py review demo                  # client notes page
 python3 tools/vf.py export demo --format fcpxml  # editor timeline
+python3 tools/vf.py reference demo ~/ad.mp4      # study a video to imitate
+python3 tools/vf.py status                       # every project and its next step
 python3 tools/vf.py ff <tool> --help             # any ffmpeg-skill tool, with the right ffmpeg
 ```
 
@@ -309,6 +313,10 @@ python3 tools/vf.py ff <tool> --help             # any ffmpeg-skill tool, with t
 
 מנוע Gemini שלו (לבחירה) מעלה את הסרטון לגוגל, ולכן חומר של לקוחות כדאי להשאיר בכלים המקומיים
 של video-factory.
+
+## השוואה לכלים אחרים
+
+מול כלי הסוכנים (‏OpenMontage, ‏video-use, ‏Kinocut ועוד) ומול עורכים מסחריים (‏Descript, ‏CapCut, ‏OpusClip, ‏Premiere, ‏Resolve): מה הפרויקט עושה שהם לא, ואיפה הוא חלש. ראו [docs/comparison.he.md](docs/comparison.he.md).
 
 ## מגבלות כרגע
 

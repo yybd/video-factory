@@ -190,6 +190,8 @@ and tells you which.
 | "Help me plan a promo for X" | brief: goal, audience, one message, call to action, length |
 | "What should I film?" / "interview questions for the CEO" | shot list and questions that make good sound bites |
 | "Did I film everything?" | compares the footage and transcripts with the shot list |
+| "Make it feel like this ad" (a file) / "I like these transitions" (a clip) | studies its pace, transitions, captions and graphics, and applies them to your edit |
+| "Where are we?" / "what's next?" | `status`: what is done in each project and the next step |
 
 ### Brand and motion graphics
 
@@ -274,6 +276,8 @@ python3 tools/vf.py render demo --draft
 python3 tools/vf.py render demo --version reels
 python3 tools/vf.py review demo                  # client notes page
 python3 tools/vf.py export demo --format fcpxml  # editor timeline
+python3 tools/vf.py reference demo ~/ad.mp4      # study a video to imitate
+python3 tools/vf.py status                       # every project and its next step
 python3 tools/vf.py ff <tool> --help             # any ffmpeg-skill tool, with the right ffmpeg
 ```
 
@@ -291,6 +295,12 @@ transitions and graphics before planning yours. It is a separate plugin and not 
 
 Its optional Gemini engine uploads the video to Google, so keep client footage on video-factory's
 own local tools.
+
+## How it compares
+
+Against the agent tools (OpenMontage, video-use, Kinocut…) and commercial editors (Descript,
+CapCut, OpusClip, Premiere, Resolve): what this does that they don't, and where it is weaker.
+See [docs/comparison.md](docs/comparison.md).
 
 ## Current limitations
 

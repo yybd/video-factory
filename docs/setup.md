@@ -28,7 +28,6 @@ python3 tools/vf.py doctor
 | `VF_WHISPER_MODEL` | ivrit.ai model in the Hugging Face cache | path to any whisper.cpp ggml model |
 | `VF_WHISPER_DTW` | from the model name | DTW alignment preset if the name does not say (`large.v3`, `large.v3.turbo`, …) |
 | `VF_FFMPEG_BIN` | Homebrew's ffmpeg-full | folder holding `ffmpeg` and `ffprobe` with libass |
-| `VF_LOCAL_MODELS` | — | optional fallback: a local-models project with `local-models transcribe` (sentence timings only) |
 | `HYPERFRAMES_NO_TELEMETRY` | `1` (set in `.claude/settings.json`) | keeps HyperFrames from sending usage events |
 | `ELEVENLABS_API_KEY`, `AZURE_SPEECH_KEY` + `AZURE_SPEECH_REGION`, `GOOGLE_TTS_API_KEY`, `OPENAI_API_KEY` | — | voice-over providers; see [Voice-over](voiceover.md) |
 

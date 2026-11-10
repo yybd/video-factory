@@ -22,6 +22,7 @@ A promo often mixes both: interview bites with a narrated opening and graphics.
 | # | Stage | What happens | Command |
 |---|---|---|---|
 | 0 | Pre-production | brief (goal, audience, message, call to action), shot list, interview questions; after filming, a coverage check against the shot list | — (Claude writes `brief.md`, `shotlist.md`) |
+| 0b | Reference | a video you want to imitate: pace, transitions, captions, graphics → `style.md` | `vf.py reference <name> <video>` |
 | 1 | Intake | the project folder; sources are linked, never copied or modified | `vf.py new <name> <folder or files>` |
 | 2a | Transcribe | Hebrew transcript with a time for every word | `vf.py transcribe <name> --prompt "names"` |
 | 2b | Look | contact sheets + scene list for footage without speech; Claude writes `visual/<src>.json` | `vf.py frames <name>` |
@@ -43,6 +44,9 @@ A promo often mixes both: interview bites with a narrated opening and graphics.
 
 Start with the free `say` voice (macOS) to time the edit. Switch to the paid voice for the final.
 Only changed beats are re-voiced.
+
+At any point, `vf.py status` shows where every project stands and the next step. Every render
+ends with an automatic QA check (length, size, streams, captions).
 
 ## What the render does, in order
 

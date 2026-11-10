@@ -41,7 +41,7 @@ reads it. All times are in seconds.
 | Key | Default | Meaning |
 |---|---|---|
 | `title` | — | shown on the review page |
-| `output` | size of the first source, 30 fps | `width`, `height`, `fps` of the result |
+| `output` | size of the first footage part's source as displayed (rotation applied), 30 fps (29.97 etc. allowed) | `width`, `height`, `fps` of the result |
 | `fit` | `pad` | how sources of another shape reach the output: `pad` (bars) or `crop` |
 | `transition` | `fade`, 0.5 | `type` and `duration` for every junction |
 | `parts` | required | the edit, in order |
@@ -97,7 +97,8 @@ from `from` for `duration`, starting `at` seconds into the part. Use `"motion": 
 
 ## Look
 
-`lut` (a `.cube` file in the project), `lut_strength` (0–1), and colour correction: `exposure`
+Correction runs first, then the LUT on top (two passes). `lut` (a `.cube` file in the project),
+`lut_strength` (0–1), and colour correction: `exposure`
 (stops), `contrast`, `saturation` (1 = unchanged), `temperature` (Kelvin), `tint`, `gamma`,
 `lift`, `gain`.
 
@@ -131,5 +132,6 @@ A translation file is `{"cues": {"<cue id>": "translated text"}}`, using the sam
 ## Versions
 
 `"versions": {"<name>": {"parts": [ids in order], …any top-level key to override…}}`.
-`vf.py render <project> --version <name>` writes `renders/<name>.mp4`. Overlays and b-roll on parts
+An empty object or `null` clears a key for that version (`"captions": {"translations": {}}` = no
+subtitles in it). `vf.py render <project> --version <name>` writes `renders/<name>.mp4`. Overlays and b-roll on parts
 that the version leaves out are skipped. Graphics re-render at the version's size.

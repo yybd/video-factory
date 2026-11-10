@@ -9,7 +9,7 @@ product videos with narration, motion graphics.
 - `projects/<name>/` holds the user's footage, keys-free project files and renders, and is
   gitignored. Never commit it, never move media elsewhere in the tree, never overwrite a source.
 - The repo is published: no machine paths, API keys or personal data in tracked files. Machine
-  specifics go through env vars (`VF_WHISPER_MODEL`, `VF_FFMPEG_BIN`, `VF_LOCAL_MODELS`); TTS keys
+  specifics go through env vars (`VF_WHISPER_MODEL`, `VF_FFMPEG_BIN`); TTS keys
   live in `.env` (gitignored) or the shell. Never echo a key into chat or a file.
 - Documentation is bilingual and kept in step: `README.md` ↔ `README.he.md`, `docs/X.md` ↔
   `docs/X.he.md`. A change to one is made to the other in the same commit. When the orchestrator's
