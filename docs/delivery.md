@@ -34,6 +34,8 @@ translation.
 
 ## Review page: timeline and client notes
 
+![The review page in English](assets/review-timeline.en.png)
+
 ```bash
 python3 tools/vf.py review <name>                 # renders/final_review.html
 python3 tools/vf.py review <name> --draft         # the draft

@@ -40,6 +40,8 @@ python3 tools/vf.py render <name> --version reels      # -> renders/reels.mp4
 
 ## דף סקירה: ציר זמן והערות ללקוח
 
+![דף הסקירה בעברית](assets/review-timeline.he.png)
+
 </div>
 
 ```bash

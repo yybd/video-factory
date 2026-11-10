@@ -23,6 +23,25 @@ locally, and your footage never leaves your machine.
 **Full documentation: [docs/](docs/README.md)**: setup, workflow, every command, the
 story.json reference, motion graphics, voice-over, delivery.
 
+## See the whole edit on a timeline, in your browser
+
+![The review page: the video, a timeline of every track, transitions, and timestamped notes](docs/assets/review-timeline.en.png)
+
+Every render can come with **one HTML file** that shows the edit the way an editing app would: the
+video, and under it a timeline of every track (parts and the transition at each junction, graphics,
+b-roll, captions, music) with a playhead that follows playback. **It needs no server and no editing
+app**: double-click it, or send it to a client with the video.
+
+On the timeline you can drag a part to a new place, click a transition to change it, click a part to
+see where it was cut from, and pause anywhere to leave a note. Everything comes back as one text that
+Claude applies to the edit. English and Hebrew, with a toggle.
+
+```bash
+python3 tools/vf.py review <name>     # renders/final_review.html, beside renders/final.mp4
+```
+
+More: [Delivery → Review page](docs/delivery.md#review-page-timeline-and-client-notes).
+
 ## What it does
 
 The **video-orchestrator** skill conducts the whole production, in two modes:

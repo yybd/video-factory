@@ -41,7 +41,9 @@ REVIEW_HTML = r"""<!doctype html>
   .ruler { position:relative; height:22px; border-bottom:1px solid var(--line); font-size:11px; color:var(--muted); }
   .tick { position:absolute; top:0; height:100%; border-left:1px solid var(--line); padding-left:3px; }
   .track { position:relative; height:34px; border-bottom:1px dashed var(--line); }
-  .track.parts { height:46px; }
+  .track.parts { height:60px; }
+  /* the junction labels get their own band above the parts, so they never cover a part's name */
+  .track.parts .clip { top:22px; }
   .tname { position:absolute; left:-92px; width:86px; top:0; bottom:0; display:flex; align-items:center;
            font-size:12px; color:var(--muted); direction:rtl; justify-content:flex-start; padding-right:6px; }
   .clip { position:absolute; top:5px; bottom:5px; border-radius:6px; color:#fff; font-size:11px; padding:2px 6px;
@@ -53,7 +55,7 @@ REVIEW_HTML = r"""<!doctype html>
   .clip.sel { outline: 3px solid var(--sel); }
   .clip.dragging { opacity:.4; }
   .clip.drop { outline: 3px dashed var(--sel); }
-  .junc { position:absolute; top:-1px; transform:translateX(-50%); z-index:3; font-size:10px; background:var(--card);
+  .junc { position:absolute; top:3px; transform:translateX(-50%); z-index:3; font-size:10px; background:var(--card);
           color:var(--ink); border:1px solid var(--line); border-radius:10px; padding:0 6px; cursor:pointer; white-space:nowrap; }
   .junc.changed { border-color: var(--accent); color: var(--accent); font-weight:600; }
   .playhead { position:absolute; top:0; bottom:0; width:2px; background:var(--accent); z-index:4; pointer-events:none; }
@@ -67,7 +69,7 @@ REVIEW_HTML = r"""<!doctype html>
   .t { font-variant-numeric: tabular-nums; color: var(--accent); cursor:pointer; direction:ltr; min-width: 58px; }
   .x { margin-inline-start:auto; background:none; color:var(--muted); padding:0 4px; }
   .legend { display:flex; gap:12px; flex-wrap:wrap; font-size:12px; color:var(--muted); margin:6px 0; }
-  .legend span::before { content:""; display:inline-block; width:10px; height:10px; border-radius:3px; margin-left:4px;
+  .legend span::before { content:""; display:inline-block; width:10px; height:10px; border-radius:3px; margin-inline-end:5px;
                          vertical-align:-1px; background: var(--c); }
   dialog { border:1px solid var(--line); border-radius:10px; background:var(--card); color:var(--ink); }
   pre { white-space: pre-wrap; unicode-bidi: plaintext; text-align:start; background:var(--bg); padding:10px; border-radius:8px;
