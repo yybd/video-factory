@@ -322,6 +322,29 @@ python3 tools/vf.py status                       # every project and its next st
 python3 tools/vf.py ff <tool> --help             # any ffmpeg-skill tool, with the right ffmpeg
 ```
 
+## Vision model (optional): where the API sits
+
+`vf.py watch` hands the footage to a vision model you choose, and it suggests: a shot log, visual
+scores for shorts, and a check of the final video. Set it once in `.env` (copy `.env.example`,
+which lists every variable), or per command with `--base-url` and `--model`.
+
+- **`openai` provider:** any OpenAI-compatible server, such as LM Studio, Ollama, a GPU machine on
+  your home network, OpenAI or OpenRouter. Only the address changes.
+- **`gemini` provider:** the only one that watches video with its sound, so it catches laughter,
+  reactions and music. The others see still frames only.
+- **Privacy:** any address off your machine or network is refused unless you add `--allow-cloud`.
+  Gemini gets a small 480p copy, deleted after the answer.
+- **Check:** `vf.py doctor` shows which vision model is set and whether it answers.
+
+```bash
+# .env
+VF_VISION_PROVIDER=openai
+VF_VISION_BASE_URL=http://localhost:1234/v1     # LM Studio; Ollama: http://localhost:11434/v1
+VF_VISION_MODEL=google/gemma-4-e4b
+```
+
+Full details: [docs/vision.md](docs/vision.md).
+
 ## Recommended companion: `/watch`
 
 [claude-video](https://github.com/bradautomates/claude-video) (MIT) lets Claude **watch** a

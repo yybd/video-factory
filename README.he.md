@@ -334,6 +334,33 @@ python3 tools/vf.py ff <tool> --help             # any ffmpeg-skill tool, with t
 
 <div dir="rtl">
 
+## מודל ראייה (אופציונלי): איפה יושב ה-API
+
+‏`vf.py watch` מעביר את החומר למודל ראייה שאתם בוחרים, והוא מציע: רשימת שוטים, ציון חזותי לקליפים
+ובדיקת הסרטון הסופי. אפשר להגדיר פעם אחת בקובץ `.env` (העתיקו את `.env.example`, שמפרט את כל
+המשתנים), או בכל פקודה עם הדגלים `--base-url` ו-`--model`.
+
+- **סוג `openai`:** מתאים לכל שרת שתואם ל-OpenAI, כמו LM Studio, ‏Ollama, מחשב עם GPU ברשת
+  הביתית, OpenAI או OpenRouter. משנים רק את הכתובת.
+- **סוג `gemini`:** היחיד שצופה בווידאו עם הסאונד, כך שהוא קולט צחוק, תגובות ומוזיקה. השאר רואים
+  רק תמונות סטילס.
+- **פרטיות:** כל כתובת מחוץ למחשב או לרשת שלכם נחסמת, אלא אם מוסיפים `--allow-cloud`. ל-Gemini עולה
+  עותק קטן ב-480p, שנמחק אחרי התשובה.
+- **בדיקה:** ‏`vf.py doctor` מראה איזה מודל ראייה מוגדר והאם הוא עונה.
+
+</div>
+
+```bash
+# .env
+VF_VISION_PROVIDER=openai
+VF_VISION_BASE_URL=http://localhost:1234/v1     # LM Studio; Ollama: http://localhost:11434/v1
+VF_VISION_MODEL=google/gemma-4-e4b
+```
+
+<div dir="rtl">
+
+הפירוט המלא: [docs/vision.he.md](docs/vision.he.md).
+
 ## כלי משלים מומלץ: ‏`/watch`
 
 [claude-video](https://github.com/bradautomates/claude-video) (MIT) מאפשר ל-Claude **לצפות**
