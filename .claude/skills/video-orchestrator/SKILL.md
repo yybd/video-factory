@@ -1,6 +1,6 @@
 ---
 name: video-orchestrator
-description: 'Make a finished video from raw footage or from a script: transcribe with word timings (Hebrew first), understand footage without speech, split it into parts by meaning or at exact seconds, build a story, clean fillers and pauses, join with transitions, add brand, motion graphics and infographics (titles, lower thirds, numbers, charts, end cards), b-roll, music, a TTS voice-over, right-to-left captions with karaoke, second-language subtitles, vertical and short versions, a client review page and an editor timeline. Use for any video work in this repo — editing, promo / corporate videos (סרטון תדמית), product videos with narration, reels — e.g. "cut this by topic", "cut from 1:20 to 1:45", "make a promo", "add a lower third", "make a chart of these numbers", "narrate this script", "make a 30-second vertical version", "תחתוך לפי נושאים", "תעשה סרטון תדמית", "תוסיף כותרת תחתונה", "קריינות", "גרסה לרילס", "תוסיף כתוביות", "תוריד את האממ". It plans and decides; tools/vf.py, ffmpeg-skill and HyperFrames execute.'
+description: 'Make a finished video from raw footage or from a script: transcribe with word timings (Hebrew first), understand footage without speech, split it into parts by meaning or at exact seconds, build a story, clean fillers and pauses, join with transitions, add brand, motion graphics and infographics (titles, lower thirds, numbers, charts, end cards), b-roll, music, a TTS voice-over, right-to-left captions with karaoke, second-language subtitles, vertical and short versions, a client review page and an editor timeline, and optionally a vision model (local or cloud) that logs shots, scores shorts and checks a render. Use for any video work in this repo — editing, promo / corporate videos (סרטון תדמית), product videos with narration, reels — e.g. "cut this by topic", "cut from 1:20 to 1:45", "make a promo", "add a lower third", "make a chart of these numbers", "narrate this script", "make a 30-second vertical version", "תחתוך לפי נושאים", "תעשה סרטון תדמית", "תוסיף כותרת תחתונה", "קריינות", "גרסה לרילס", "תוסיף כתוביות", "תוריד את האממ", "תן למודל לצפות בחומר". It plans and decides; tools/vf.py, ffmpeg-skill and HyperFrames execute.'
 ---
 
 # video-orchestrator
@@ -84,6 +84,13 @@ in the background for anything over a few minutes. `--language` for other langua
 `{"shots": [{"start", "end", "description", "shot": "wide|medium|close|detail|screen",
 "subject", "quality", "note"}]}`. Describe only what is visible. For a closer look use
 `python3 tools/vf.py ff look source/<file> --at <t>`.
+**A vision model, when one is set** (`vf.py doctor` shows the `vision` line): `python3 tools/vf.py
+watch <name>` writes `visual/<src>.watch.json`, a model's shot log with b-roll / hero suggestions,
+shown as `WATCH` lines in `transcript`. Use it for b-roll and footage without speech, not for a
+talking head. Its times are accurate to about a second and it can be wrong: check a suggestion
+against the sheets or `ff look` before relying on it, and still write your own `visual/<src>.json`.
+It is local by default. Never add `--allow-cloud` (or suggest Gemini for client footage) unless the
+user says the footage may leave the machine. Where the API sits and which models: `docs/vision.md`.
 For a *reference* video the user wants to imitate (a YouTube ad, a competitor's promo), the
 separate `/watch` plugin (claude-video) can watch it from a URL. It is not part of this repo.
 
@@ -108,6 +115,9 @@ caption or a face, and that the logo does not fight a lower third.
 
 Every render ends with a QA check (length vs plan, size, streams, captions, subtitle tracks).
 Exit code 2 = something is off. Never report such a render as done; fix the cause first.
+With a vision model set, `python3 tools/vf.py watch <name> --task qa [--render draft]` adds a second pair
+of eyes (text over faces, cut-off heads, black frames, hidden logo). Look at each flagged moment
+yourself before changing anything; report false alarms as such, not as fixes.
 `story.json` is validated before anything renders, and all its problems are listed at once.
 
 ### 6. Fix captions
@@ -217,6 +227,9 @@ Report in ffmpeg-skill's format: `Done:` / `Steps:` / `Check:` / `Look:` / `Note
 
 1. `python3 tools/vf.py candidates <name> [--min 15 --max 60 --top 12]` ranks windows of whole
    transcript segments and writes `candidates.json` with their full text. The score is a pointer only.
+   With a vision model set, `python3 tools/vf.py watch <name> --task clips` adds a `visual` score and
+   reason to each, and a `combined` rank. Picture breaks a tie between equal words; it never rescues
+   a clip whose words do not stand alone.
 2. Read every candidate in full and choose like a social editor. A clip:
    - makes sense with **no context** (no "as I said", no dangling "that");
    - **opens on its strongest line**, so trim to start at the hook even mid-segment (word times are in

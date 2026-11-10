@@ -10,6 +10,7 @@ deterministic work around that decision:
   vf.py transcript <project> [--words] print transcripts (and visual notes) as "[src mm:ss.ss-mm:ss.ss] text"
   vf.py frames <project> [--every N]   contact sheets with timecodes + scene list, for footage without speech
   vf.py scenes <project>               visual scene changes per source
+  vf.py watch <project> [--task T]     a vision model's suggestions: shot log, clip scores, render QA
   vf.py status [project]               where each project stands, and the next step
   vf.py reference <project> <video>    study a video to imitate: pace, transitions, look, captions
   vf.py candidates <project>           moments that could stand alone as shorts, ranked for Claude to judge
@@ -287,6 +288,21 @@ def cmd_doctor(_a) -> None:
     print(f"node        : {ver or 'MISSING'}"
           + ("" if major >= 22 else "  — motion graphics need Node.js 22+ (brew install node)"))
     print(f"npx         : {shutil.which('npx') or 'MISSING — comes with Node.js'}")
+    import vf_voice
+    vf_voice.load_env(ROOT)
+    vp = (os.environ.get("VF_VISION_PROVIDER") or "openai").lower()
+    base = os.environ.get("VF_VISION_BASE_URL") or ("https://generativelanguage.googleapis.com" if vp == "gemini"
+                                                    else "http://localhost:1234/v1")
+    if vp == "gemini":
+        seen = "key set" if (os.environ.get("VF_VISION_API_KEY") or os.environ.get("GEMINI_API_KEY")) else "no key"
+    else:
+        try:
+            import urllib.request
+            urllib.request.urlopen(base.rstrip("/") + "/models", timeout=3).read()
+            seen = "reachable"
+        except Exception:
+            seen = "not reachable"
+    print(f"vision      : {vp} at {base} — {seen}  (optional: vf.py watch; docs/vision.md)")
     if not ok:
         print("\nnot ready — fix the MISSING lines above (docs/setup.md)")
     elif major < 22:
@@ -403,10 +419,12 @@ def cmd_transcript(a) -> None:
                                            + ("*" if norm_word(w["word"]) in fillers else "")
                                            for w in s["words"])
             rows.append((s["start"], line))
-        vf = proj / "visual" / f"{name}.json"
-        if vf.exists():
+        for tag, vf in (("VISUAL", proj / "visual" / f"{name}.json"), ("WATCH", proj / "visual" / f"{name}.watch.json")):
+            if not vf.exists():
+                continue
             for v in json.loads(vf.read_text(encoding="utf-8")).get("shots", []):
-                rows.append((float(v["start"]), f"[{name} {fmt(v['start'])}-{fmt(v['end'])} VISUAL] "
+                extra = f" ({v['use']}, q{v.get('quality', '?')})" if tag == "WATCH" and v.get("use") else ""
+                rows.append((float(v["start"]), f"[{name} {fmt(v['start'])}-{fmt(v['end'])} {tag}{extra}] "
                                                  f"{v.get('description', '')}"))
         for _, line in sorted(rows, key=lambda r: r[0]):
             print(line)
@@ -614,6 +632,7 @@ def cmd_status(a) -> None:
         for n in srcs:
             tr = "transcript ✓" if (proj / "transcript" / f"{n}.json").exists() else "no transcript"
             vis = ", visual notes ✓" if (proj / "visual" / f"{n}.json").exists() else ""
+            vis += ", model shot log ✓" if (proj / "visual" / f"{n}.watch.json").exists() else ""
             print(f"  source {n}: {tr}{vis}" + ("  — LINK BROKEN (original moved?)" if n in broken else ""))
         for f, label in (("brief.md", "brief"), ("script.md", "script"), ("brand.json", "brand"),
                          ("segments.json", "segments"), ("voice/voiceover.wav", "voice-over")):
@@ -1512,6 +1531,75 @@ def cmd_review(a) -> None:
     print(f"  {page}\n  send the client the renders/ folder (or both files); notes come back as text")
 
 
+def cmd_watch(a) -> None:
+    """A vision model looks at the footage and suggests; it never cuts. See tools/vf_vision.py."""
+    import vf_vision
+    import vf_voice
+    proj = project_dir(a.project)
+    vf_voice.load_env(proj)
+    v = vf_vision.Vision.from_args(a)
+    where = "this machine" if v.label()["local"] else f"{v.host} (cloud)"
+    print(f"  watching with {v.model} on {where}")
+    ffmpeg = ffbin("ffmpeg")
+    with vf_vision.tempdir() as td:
+        tmp = Path(td)
+        if a.task == "log":
+            srcs = sources(proj)
+            only = set(a.only.split(",")) if a.only else None
+            for name, path in srcs.items():
+                if only and name not in only:
+                    continue
+                if not path.exists():
+                    print(f"  {name}: link broken, skipped")
+                    continue
+                dur = probe_duration(path)
+                every = a.every or min(10.0, max(1.0, round(dur / 48, 1)))
+                segs = load_transcript(proj, name) if (proj / "transcript" / f"{name}.json").exists() else []
+                (proj / "visual").mkdir(exist_ok=True)
+                out = proj / "visual" / f"{name}.watch.json"
+                doc = vf_vision.watch_log(v, ffmpeg, name, path, dur, segs, out, every, a.batch, tmp)
+                usable = [s for s in doc["shots"] if s.get("use") in ("hero", "broll")]
+                print(f"  {name}: {len(doc['shots'])} shot(s), {len(usable)} suggested as hero/b-roll -> {out}")
+                for s in usable[:8]:
+                    print(f"    {fmt(s['start'])}-{fmt(s['end'])} [{s.get('use')}, q{s.get('quality', '?')}"
+                          f" e{s.get('energy', '?')}] {str(s.get('description', ''))[:90]}")
+        elif a.task == "clips":
+            path = proj / "candidates.json"
+            data = read_json(path, "candidates.json (run vf.py candidates first)")
+            cands = data.get("candidates", [])
+            if not cands:
+                sys.exit("candidates.json is empty — run vf.py candidates first")
+            vf_vision.watch_clips(v, ffmpeg, cands, sources(proj), tmp)
+            for c in cands:
+                if "visual" in c:
+                    c["combined"] = round(c["score"] + 1.5 * (c["visual"]["score"] - 3), 2)
+            path.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+            scored = sorted(cands, key=lambda c: -c.get("combined", c["score"]))
+            for k, c in enumerate(scored, 1):
+                vis = c.get("visual", {})
+                print(f"  #{k} [{c['source']} {fmt(c['start'])}-{fmt(c['end'])}] text {c['score']}"
+                      f" visual {vis.get('score', '-')} -> {c.get('combined', c['score'])}  {vis.get('why', '')[:80]}")
+            print(f"  -> {path} (each candidate now has \"visual\" and \"combined\")")
+        else:
+            renders = proj / "renders"
+            video = renders / f"{a.render}.mp4" if a.render else next(
+                (renders / f"{n}.mp4" for n in ("final", "draft") if (renders / f"{n}.mp4").exists()), None)
+            if not video or not video.exists():
+                sys.exit(f"no render to watch{' named ' + a.render if a.render else ''} — vf.py render first")
+            r = subprocess.run([ffbin("ffprobe"), "-v", "error", "-select_streams", "v:0", "-show_entries",
+                                "stream=width,height", "-of", "csv=p=0", str(video)], capture_output=True, text=True)
+            w, h = (int(x) for x in r.stdout.strip().split(",")[:2])
+            dur = probe_duration(video)
+            every = a.every or min(4.0, max(1.0, round(dur / 40, 1)))
+            out = video.with_suffix(".watch.json")
+            doc = vf_vision.watch_qa(v, ffmpeg, video, dur, w, h, out, every, a.batch, tmp)
+            print(f"  {video.name}: {len(doc['issues'])} possible issue(s) -> {out}")
+            for i in doc["issues"]:
+                span = fmt(i["at"]) + (f"-{fmt(i['until'])}" if "until" in i else "")
+                print(f"    {span} [{i['severity']}, {i['kind']}] {i['problem']}")
+            print("  these are a model's suggestions: look at each moment (vf.py ff look) before changing anything")
+
+
 def cmd_export(a) -> None:
     import vf_motion, vf_review
     proj = project_dir(a.project)
@@ -1617,6 +1705,20 @@ def main() -> None:
     p.add_argument("--draft", action="store_true", help="the draft render (or <version>_draft)")
     p.add_argument("--lang", default="he", choices=["he", "en"], help="the page's starting language (it has a toggle)")
     p.set_defaults(fn=cmd_review)
+
+    p = sub.add_parser("watch", help="a vision model looks and suggests: shot log, clip scores, render QA")
+    p.add_argument("project")
+    p.add_argument("--task", default="log", choices=["log", "clips", "qa"],
+                   help="log: shots per source; clips: visual score for candidates.json; qa: problems in a render")
+    p.add_argument("--provider", default="", help="openai (any OpenAI-compatible server, default) or gemini")
+    p.add_argument("--base-url", default="", help="where the API sits (default VF_VISION_BASE_URL, else LM Studio on localhost)")
+    p.add_argument("--model", default="", help="model id (default VF_VISION_MODEL, else the first the server lists)")
+    p.add_argument("--allow-cloud", action="store_true", help="allow sending footage to an endpoint off this machine")
+    p.add_argument("--every", type=float, default=0, help="seconds between frames (log, qa)")
+    p.add_argument("--batch", type=int, default=6, help="frames per request (smaller for small local models)")
+    p.add_argument("--only", default="", help="log: these sources only, e.g. intro,ceo")
+    p.add_argument("--render", default="", help="qa: the render to watch, e.g. final, draft, reels (default final, else draft)")
+    p.set_defaults(fn=cmd_watch)
 
     p = sub.add_parser("export", help="the edit as an editor timeline (Resolve / Premiere / Final Cut)")
     p.add_argument("project"); p.add_argument("--format", default="fcpxml", choices=["fcpxml", "edl", "otio"])

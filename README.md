@@ -22,7 +22,9 @@ The **video-orchestrator** skill conducts the whole production, in two modes:
 
 **Editing**
 - **Transcribe** with a time for every word. **Look** at footage without speech through
-  timecoded contact sheets, and Claude writes down what each shot shows.
+  timecoded contact sheets, and Claude writes down what each shot shows. Optionally a **vision model**
+  you choose (local in LM Studio or Ollama, or Gemini) watches too: shot log, visual scores for
+  shorts, and a look for problems in the render.
 - **Segment by meaning**: parts of one idea or one moment each, with cuts moved out of words.
   Or cut at **exact seconds**.
 - **Build a story** with a reason for each part, and **wait for your approval**.
@@ -69,7 +71,8 @@ platform exports) comes from the vendored [ffmpeg-skill](https://github.com/kaji
 - **Hand-off both ways.** A review page anyone can open, and an FCPXML / EDL / OTIO timeline for
   Premiere, Resolve or Final Cut. No other agent tool surveyed has either.
 - **Show, don't describe.** Give it a video you like, and it measures the pace and reads the transitions.
-- **Open and private.** MIT, local (only TTS is in the cloud, and only if you choose it), no account.
+- **Open and private.** MIT, local (only TTS, or a cloud vision model, leaves the machine, and only if
+  you choose it), no account.
 
 Where it is weaker (no GUI editor, no AI-generated footage or avatars, no stock library) and how it
 compares with OpenMontage, video-use, Kinocut, Descript, OpusClip and others:
@@ -142,6 +145,7 @@ and tells you which.
 | "Show me the transcript" / "…with word times" | prints it by clip and time; fillers are marked |
 | "What's in the footage?" / "There's no talking, it's travel footage" | contact sheets and scene changes; Claude describes each shot |
 | "Where does he talk about X?" | finds the moment in the transcript |
+| "Have the vision model go over the b-roll" | `vf.py watch`: shots, quality, energy, b-roll suggestions, from the model you set |
 
 ### Cutting
 
@@ -267,6 +271,8 @@ and tells you which.
 | "Make 5 shorts of 30–45 seconds" | `clips.json`, each with a hook title |
 | "Render them, with our logo and an end card" | vertical clips with word-by-word captions, cleaned, QA-checked |
 | "The hook of clip 3 is weak, change it" | edits that clip and re-renders it alone |
+| "Score them on the picture too" | the vision model rates each candidate's reactions and movement; the rank combines words and picture |
+| "Watch the final and check it for problems" | the vision model looks for text over faces, cut-off heads, black frames, a hidden logo |
 
 ### Polishing the result (ffmpeg-skill tools)
 
@@ -292,7 +298,7 @@ and tells you which.
 .claude/skills/ffmpeg-skill/         vendored executor (MIT, kajisho5): 42 ffmpeg tools (local patch: VENDORED.md)
 .agents/skills/                      HyperFrames skills (Apache-2.0), linked into .claude/skills/
 templates/motion/                    motion graphics templates: lower-third, title, end-card, stat, bar-chart
-tools/vf.py                          the CLI the skill drives (+ vf_motion.py, vf_voice.py, vf_review.py)
+tools/vf.py                          the CLI the skill drives (+ vf_motion.py, vf_voice.py, vf_review.py, vf_vision.py)
 tools/fillers.he.txt                 Hebrew hesitation sounds that "clean" removes
 docs/                                full documentation, English and Hebrew
 projects/<name>/                     your projects: gitignored, never committed
@@ -304,6 +310,7 @@ projects/<name>/                     your projects: gitignored, never committed
 python3 tools/vf.py new demo ~/Movies/trip       # a folder or files; --copy to copy
 python3 tools/vf.py transcribe demo              # word timings
 python3 tools/vf.py frames demo                  # contact sheets + scenes, for footage without speech
+python3 tools/vf.py watch demo                   # optional: a vision model's shot log (docs/vision.md)
 python3 tools/vf.py transcript demo --words      # read it, then write projects/demo/story.json
 python3 tools/vf.py voice demo --provider say    # narration from script.md
 python3 tools/vf.py render demo --draft
@@ -342,6 +349,8 @@ See [docs/comparison.md](docs/comparison.md).
   highlight leads the voice slightly.
 - The API voice-over providers follow each provider's documented API but have not yet been run
   against a live key here. The free macOS voice is tested.
+- `vf.py watch` is tested with a local model (Gemma 4 in LM Studio). The Gemini path follows its
+  documented API but has not been run against a live key here.
 - Motion templates are designed at 16:9. Vertical versions re-flow them, so check the draft.
 
 ## License

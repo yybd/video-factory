@@ -34,11 +34,20 @@ One transcript per source, `transcript/<src>.json` (segments with words, in seco
 
 ## transcript `<project> [--words]`
 Prints every source's segments as `[src#N mm:ss.ss-mm:ss.ss] text`, interleaved with `VISUAL`
-lines from `visual/<src>.json`. `--words` adds each word with its time; `*` marks a filler.
+lines from `visual/<src>.json` and `WATCH` lines from a vision model's `visual/<src>.watch.json`. `--words` adds each word with its time; `*` marks a filler.
 
 ## frames `<project> [--every N] [--width W] [--threshold T]`
 Contact sheets of 12 timecoded tiles (`visual/<src>_sheet_NNN.png`, one tile every N seconds,
 default ~48 tiles per source) and a scene list (`visual/<src>.scenes.json`).
+
+## watch `<project> [--task log|clips|qa] [--provider P] [--base-url URL] [--model M] [--allow-cloud]`
+A vision model you choose looks at the footage and **suggests**; it never cuts. `log` (default)
+writes `visual/<src>.watch.json` (shots, quality, energy, b-roll / hero suggestions), shown by
+`transcript` as `WATCH` lines. `clips` adds `visual` and `combined` to every entry of
+`candidates.json`. `qa` writes `renders/<name>.watch.json` with possible problems in a render
+(`--render final|draft|reels…`). `--every N` seconds between frames, `--batch N` frames per request,
+`--only` sources for `log`. Where the API sits (flags or `VF_VISION_*` in `.env`), local and cloud
+servers, privacy: [Vision model](vision.md).
 
 ## status `[project]`
 Where each project stands: sources (and whether each has a transcript, visual notes, or a broken

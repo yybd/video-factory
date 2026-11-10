@@ -29,20 +29,23 @@ python3 tools/vf.py doctor
 | `VF_WHISPER_DTW` | from the model name | DTW alignment preset if the name does not say (`large.v3`, `large.v3.turbo`, …) |
 | `VF_FFMPEG_BIN` | Homebrew's ffmpeg-full | folder holding `ffmpeg` and `ffprobe` with libass |
 | `HYPERFRAMES_NO_TELEMETRY` | `1` (set in `.claude/settings.json`) | keeps HyperFrames from sending usage events |
+| `VF_VISION_PROVIDER`, `VF_VISION_BASE_URL`, `VF_VISION_MODEL`, `VF_VISION_API_KEY`, `VF_VISION_ALLOW_CLOUD` | LM Studio on localhost | where the vision model for `vf.py watch` sits; see [Vision model](vision.md) |
 | `ELEVENLABS_API_KEY`, `AZURE_SPEECH_KEY` + `AZURE_SPEECH_REGION`, `GOOGLE_TTS_API_KEY`, `OPENAI_API_KEY` | — | voice-over providers; see [Voice-over](voiceover.md) |
 
 API keys go in the shell or in a `.env` file at the repo root (or in a project folder). `.env` is
-gitignored. Never put a key in `story.json` or any tracked file.
+gitignored; `.env.example` lists every variable, so copy it to `.env` and fill in what you use. Never put a key in `story.json` or any tracked file.
 
 ## Privacy
 
-Everything runs on your machine: transcription, cutting, graphics and captions. Two things touch
+Everything runs on your machine: transcription, cutting, graphics and captions. Only these touch
 the network:
 
 - **HyperFrames** loads the GSAP animation library from a CDN while rendering a graphic. No
   footage is sent. Its telemetry is turned off for this repo.
 - **Voice-over providers** receive the script text you send them (only when you run `vf.py voice`
   with an API provider).
+- **A vision model**, only if you point `vf.py watch` at a cloud endpoint and add `--allow-cloud`.
+  The default is a local server, and anything off this machine or network is refused without it.
 
 ## Optional companion: `/watch`
 

@@ -35,19 +35,22 @@ python3 tools/vf.py doctor
 | `VF_WHISPER_DTW` | לפי שם המודל | תצורת יישור DTW, אם השם לא מציין אותה (`large.v3`, `large.v3.turbo`, …) |
 | `VF_FFMPEG_BIN` | ה-ffmpeg-full של Homebrew | התיקייה שמכילה `ffmpeg` ו-`ffprobe` עם libass |
 | `HYPERFRAMES_NO_TELEMETRY` | `1` (מוגדר ב-`.claude/settings.json`) | מונע מ-HyperFrames לשלוח אירועי שימוש |
+| `VF_VISION_PROVIDER`, `VF_VISION_BASE_URL`, `VF_VISION_MODEL`, `VF_VISION_API_KEY`, `VF_VISION_ALLOW_CLOUD` | ‏LM Studio על localhost | איפה יושב מודל הראייה של `vf.py watch`; ראו [מודל ראייה](vision.he.md) |
 | `ELEVENLABS_API_KEY`, `AZURE_SPEECH_KEY` + `AZURE_SPEECH_REGION`, `GOOGLE_TTS_API_KEY`, `OPENAI_API_KEY` | — | ספקי קריינות; ראו [קריינות](voiceover.he.md) |
 
 מפתחות API נכנסים ל-shell או לקובץ `.env` בשורש המאגר (או בתיקיית פרויקט). `.env` מופיע
-ב-gitignore. לעולם אין לשים מפתח ב-`story.json` או בשום קובץ שנמצא במעקב.
+ב-gitignore. ‏`.env.example` מפרט את כל המשתנים: מעתיקים אותו ל-`.env` וממלאים רק את מה שמשתמשים בו. לעולם אין לשים מפתח ב-`story.json` או בשום קובץ שנמצא במעקב.
 
 ## פרטיות
 
-הכול רץ על המחשב שלכם: תמלול, חיתוך, גרפיקה וכתוביות. רק שני דברים פונים לרשת:
+הכול רץ על המחשב שלכם: תמלול, חיתוך, גרפיקה וכתוביות. רק אלה פונים לרשת:
 
 - **HyperFrames** טוען את ספריית האנימציה GSAP מ-CDN בזמן רינדור של גרפיקה. שום חומר מצולם
   לא נשלח. הטלמטריה שלו כבויה במאגר הזה.
 - **ספקי הקריינות** מקבלים את טקסט התסריט שאתם שולחים אליהם (רק כשמריצים `vf.py voice`
   עם ספק API).
+- **מודל ראייה**, רק אם מכוונים את `vf.py watch` לכתובת בענן ומוסיפים `--allow-cloud`. ברירת המחדל
+  היא שרת מקומי, וכל כתובת מחוץ למחשב או לרשת נחסמת בלי הדגל.
 
 ## תוסף נלווה אופציונלי: `/watch`
 

@@ -10,7 +10,7 @@ Hebrew video. Pricing and star counts change often. Hebrew support is what each 
 
 | Tool | Kind | Licence / price | Local? | Hebrew transcription | RTL captions / karaoke |
 |---|---|---|---|---|---|
-| **video-factory** | Claude Code skill + CLI | MIT | yes (TTS is the only cloud step) | ivrit.ai, word-level | yes / yes |
+| **video-factory** | Claude Code skill + CLI | MIT | yes (TTS and an optional cloud vision model are the only cloud steps) | ivrit.ai, word-level | yes / yes |
 | [OpenMontage](https://github.com/calesthio/OpenMontage) | agentic production system, 12 pipelines | AGPL-3.0 | yes (cloud providers optional) | not stated | not stated |
 | [video-use](https://github.com/browser-use/video-use) | Claude Code skill: folder of clips → final.mp4 | MIT | editing yes, transcription via ElevenLabs (cloud) | not stated | not stated |
 | [Kinocut](https://github.com/KyaniteLabs/kinocut) | MCP server, up to 205 tools | Apache-2.0 | yes | Whisper, optional | not stated |
@@ -54,7 +54,7 @@ Hebrew video. Pricing and star counts change often. Hebrew support is what each 
 | No stock footage search | OpenMontage (Pexels, Archive.org, NASA), Pictory |
 | No light leaks or whip pans among the ~60 transitions (per junction since 2026-11) | claude-code-video-toolkit |
 | Voice-over: paid providers untested here, no free local Hebrew TTS | OpenMontage (Piper offline), claude-code-video-toolkit (voice cloning) |
-| "Best moments" clipping is Claude-judged, not a trained virality model | OpusClip, Riverside Magic Clips (no Hebrew) |
+| "Best moments" clipping is Claude-judged with a vision model's score, not a trained virality model | OpusClip, Riverside Magic Clips (no Hebrew) |
 | No direct publishing to platforms | video-editing-skill (WoopSocial) |
 
 ## Ideas worth taking
@@ -63,7 +63,8 @@ Hebrew video. Pricing and star counts change often. Hebrew support is what each 
    blocking a bad file from being reported as done.
 2. **Shader transitions** through HyperFrames' registry (light leak, zoom blur, whip pan) on top of
    the ~60 per-junction types.
-3. **Audio energy and laughter** in the clip scoring, alongside the transcript signals.
+3. **Audio energy and laughter** in the clip scoring on the local path too. Today only Gemini hears the
+   sound in `vf.py watch --task clips`, and a local model scores the picture.
 4. A **free local Hebrew TTS**, if a good open voice appears, so narration also stays local.
 5. **Free stock search** (Pexels, Wikimedia) to fill b-roll gaps.
 6. A public **Hebrew benchmark**: transcription accuracy and screenshots of mixed

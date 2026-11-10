@@ -10,6 +10,7 @@
 | [story.json reference](story-json.md) | The edit file: parts, cleaning, transitions, captions, promo layer, versions |
 | [Motion graphics](motion-graphics.md) | Built-in templates and their variables, brand, custom HyperFrames graphics |
 | [Voice-over](voiceover.md) | Script format, TTS providers, timing visuals to the voice |
+| [Vision model](vision.md) | `vf.py watch`: where the API sits, local or cloud, shot log, clip scores, render QA |
 | [Delivery](delivery.md) | Versions, second-language subtitles, client review, editor timelines, platform checks |
 | [How it compares](comparison.md) | The landscape of agent and commercial video tools, what this does that others don't, and its gaps |
 

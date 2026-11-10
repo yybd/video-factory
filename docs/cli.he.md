@@ -35,11 +35,19 @@
 
 ## transcript `<project> [--words]`
 מדפיס את המקטעים של כל קובץ מקור בצורה `[src#N mm:ss.ss-mm:ss.ss] text`, משולבים עם שורות
-`VISUAL` מתוך `visual/<src>.json`. `--words` מוסיף כל מילה עם הזמן שלה; `*` מסמן הברת היסוס.
+`VISUAL` מתוך `visual/<src>.json` ושורות `WATCH` מתוך `visual/<src>.watch.json` של מודל ראייה. `--words` מוסיף כל מילה עם הזמן שלה; `*` מסמן הברת היסוס.
 
 ## frames `<project> [--every N] [--width W] [--threshold T]`
 גיליונות תמונות ממוזערות של 12 אריחים עם קוד זמן (`visual/<src>_sheet_NNN.png`, אריח אחד כל N
 שניות, ברירת מחדל כ-48 אריחים לכל קובץ מקור) ורשימת סצנות (`visual/<src>.scenes.json`).
+
+## watch `<project> [--task log|clips|qa] [--provider P] [--base-url URL] [--model M] [--allow-cloud]`
+מודל ראייה שאתם בוחרים מסתכל על החומר ו**מציע**, ואף פעם לא חותך. ‏`log` (ברירת מחדל) כותב
+‏`visual/<src>.watch.json` (שוטים, איכות, אנרגיה, הצעות לצילומי אווירה ולשוט מרכזי), ו-`transcript`
+מציג אותם כשורות `WATCH`. ‏`clips` מוסיף `visual` ו-`combined` לכל מועמד ב-`candidates.json`. ‏`qa`
+כותב `renders/<name>.watch.json` עם בעיות אפשריות ברינדור (`--render final|draft|reels…`).
+‏`--every N` שניות בין פריימים, `--batch N` פריימים לבקשה, `--only` קובצי מקור ל-`log`. איפה יושב
+ה-API (בדגלים, או `VF_VISION_*` ב-`.env`), שרתים מקומיים ובענן ופרטיות: [מודל ראייה](vision.he.md).
 
 ## status `[project]`
 
