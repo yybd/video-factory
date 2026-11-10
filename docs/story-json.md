@@ -144,9 +144,9 @@ it. Captions follow the narration (`transcript/voiceover.json`) unless `captions
 | Key | Default | Meaning |
 |---|---|---|
 | `enabled` | `true` | |
-| `language` | `he` | also picks the filler list |
+| `language` | the project's | also picks the filler list |
 | `source` | `voiceover` when there is one, else `parts` | where the words come from |
-| `font` | brand font, else `Arial Hebrew` | any installed family with Hebrew glyphs |
+| `font` | brand font, else one that covers the language (`Arial Hebrew` for Hebrew on macOS) | any installed family with the language's glyphs |
 | `size`, `position` (`bottom`, `top`, `center`), `max_lines` (2), `animate` (`fade`, `pop`, `slide`) | | look |
 | `karaoke`, `karaoke_style` (`sweep`, `word`) | off | highlight each word as it is spoken |
 | `cues` | — | corrections: `{"id": "<source>:<segment #>" or "voiceover:<#>", "text"}` |

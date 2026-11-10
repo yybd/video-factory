@@ -45,7 +45,7 @@ REVIEW_HTML = r"""<!doctype html>
   .tname { position:absolute; left:-92px; width:86px; top:0; bottom:0; display:flex; align-items:center;
            font-size:12px; color:var(--muted); direction:rtl; justify-content:flex-start; padding-right:6px; }
   .clip { position:absolute; top:5px; bottom:5px; border-radius:6px; color:#fff; font-size:11px; padding:2px 6px;
-          overflow:hidden; white-space:nowrap; text-overflow:ellipsis; cursor:pointer; direction:rtl; text-align:right;
+          overflow:hidden; white-space:nowrap; text-overflow:ellipsis; cursor:pointer; unicode-bidi:plaintext; text-align:start;
           box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); }
   .clip.footage { background:var(--foot); } .clip.motion { background:var(--motion); }
   .clip.ov { background:var(--ov); } .clip.broll { background:var(--broll); } .clip.cap { background:var(--cap); }

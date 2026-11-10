@@ -156,9 +156,9 @@
 | מפתח | ברירת מחדל | משמעות |
 |---|---|---|
 | `enabled` | `true` | |
-| `language` | `he` | קובע גם את רשימת הברות ההיסוס |
+| `language` | של הפרויקט | קובע גם את רשימת הברות ההיסוס |
 | `source` | `voiceover` כשיש קריינות, אחרת `parts` | מאיפה מגיעות המילים |
-| `font` | גופן המיתוג, אחרת `Arial Hebrew` | כל משפחת גופנים מותקנת שיש בה אותיות עבריות |
+| `font` | גופן המיתוג, אחרת גופן שמכסה את השפה (`Arial Hebrew` לעברית ב-macOS) | כל משפחת גופנים מותקנת שיש בה האותיות של השפה |
 | `size`, `position` (`bottom`, `top`, `center`), `max_lines` (2), `animate` (`fade`, `pop`, `slide`) | | מראה |
 | `karaoke`, `karaoke_style` (`sweep`, `word`) | כבוי | הדגשת כל מילה ברגע שהיא נאמרת |
 | `cues` | — | תיקונים: `{"id": "<source>:<segment #>" or "voiceover:<#>", "text"}` |

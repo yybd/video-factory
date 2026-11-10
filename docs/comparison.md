@@ -2,8 +2,8 @@
 
 # How video-factory compares (November 2026)
 
-A survey of agent-driven video tools and commercial AI editors, focused on what matters for
-Hebrew video. Pricing and star counts change often. Hebrew support is what each vendor
+A survey of agent-driven video tools and commercial AI editors. video-factory works in any language
+Whisper speaks; this survey looks hardest at Hebrew and right-to-left, where most tools fall short. Pricing and star counts change often. Hebrew support is what each vendor
 **states**; most of it was not tested hands-on.
 
 ## At a glance

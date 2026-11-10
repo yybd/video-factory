@@ -4,9 +4,9 @@
   "items" is a JSON string: [{"label":"2023","value":120},{"label":"2024","value":180}] (up to 8).
   vf.py sets the length by rewriting every data-duration marked data-vf-dur.
 -->
-<html lang="he" dir="rtl"
+<html lang="en" dir="ltr"
   data-composition-variables='[
-    {"id":"title","type":"string","label":"Title","default":"הכנסות לפי שנה"},
+    {"id":"title","type":"string","label":"Title","default":"Revenue by year"},
     {"id":"items","type":"string","label":"Items (JSON)","default":"[{\"label\":\"2022\",\"value\":80},{\"label\":\"2023\",\"value\":120},{\"label\":\"2024\",\"value\":175},{\"label\":\"2025\",\"value\":240}]"},
     {"id":"unit","type":"string","label":"Unit after values","default":""},
     {"id":"highlight","type":"number","label":"Highlighted bar (1-based, 0 = last)","default":0},
@@ -21,10 +21,10 @@
     <meta name="viewport" content="width=1920, height=1080" />
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
     <style>
-      @font-face { font-family: "VF Hebrew"; src: local("Heebo"), local("Assistant"), local("Arial Hebrew"), local("Noto Sans Hebrew"), local("Arial"); }
+      @font-face { font-family: "VF Sans"; src: local("Inter"), local("Helvetica Neue"), local("Heebo"), local("Arial Hebrew"), local("Noto Sans"), local("Arial"); }
       * { margin: 0; padding: 0; box-sizing: border-box; }
       html, body { width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
-      #root { position: relative; width: 100%; height: 100%; font-family: "VF Hebrew", sans-serif; }
+      #root { position: relative; width: 100%; height: 100%; font-family: "VF Sans", sans-serif; }
       #bg { position: absolute; inset: 0; background: var(--panel); }
       #root.clear #bg { background: color-mix(in srgb, var(--panel) 70%, transparent); }
       #title { position: absolute; top: 110px; right: 160px; left: 160px; color: var(--ink); font-size: 76px; font-weight: 800; }
@@ -39,7 +39,7 @@
       .lab { position: absolute; bottom: 100px; color: var(--ink); opacity: 0.85; font-size: 40px; }
       #labels { position: absolute; right: 160px; left: 160px; bottom: 100px; display: flex; justify-content: space-around; gap: 40px; }
       #labels div { flex: 1; max-width: 260px; text-align: center; color: var(--ink); opacity: 0.85; font-size: 40px; white-space: nowrap; }
-      #source { position: absolute; bottom: 40px; right: 160px; color: var(--ink); opacity: 0.55; font-size: 26px; }
+      #source { position: absolute; bottom: 40px; inset-inline-start: 160px; color: var(--ink); opacity: 0.55; font-size: 26px; }
     </style>
   </head>
   <body>
@@ -47,7 +47,7 @@
          data-width="1920" data-height="1080">
       <div id="card" class="clip" data-start="0" data-duration="6" data-vf-dur data-track-index="0">
         <div id="bg"></div>
-        <div id="title" data-var-text="title">הכנסות לפי שנה</div>
+        <div id="title" data-var-text="title">Revenue by year</div>
         <div id="chart"></div>
         <div id="labels"></div>
         <div id="source" data-var-text="source"></div>

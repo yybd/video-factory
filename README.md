@@ -11,12 +11,14 @@
 
 Make videos by talking to Claude Code. Drop in raw footage, or write a script, and say what
 you want: *"cut the interview by topic, open with a title card, a lower third for the CEO, cover
-the factory talk with b-roll, a chart of our growth, music, end card, Hebrew captions, and a
+the factory talk with b-roll, a chart of our growth, music, end card, captions, and a
 vertical version for Reels"*. You get back a finished `final.mp4`.
 
-Built for Hebrew first: local Hebrew transcription (ivrit.ai Whisper) that times every word,
-right-to-left captions and graphics rendered correctly, karaoke included. Editing runs locally,
-and your footage never leaves your machine.
+**Any language Whisper speaks** (English, Spanish, French, German, Arabic and about 95 more), with a
+time for every word, karaoke captions and graphics that follow the language's reading direction.
+**Right-to-left is built in, and Hebrew is first-class**: the ivrit.ai model for Hebrew speech,
+Hebrew hesitation sounds removed, and captions and graphics laid out right to left. Editing runs
+locally, and your footage never leaves your machine.
 
 **Full documentation: [docs/](docs/README.md)**: setup, workflow, every command, the
 story.json reference, motion graphics, voice-over, delivery.
@@ -68,12 +70,13 @@ platform exports) comes from the vendored [ffmpeg-skill](https://github.com/kaji
 
 ## Why video-factory
 
-- **Hebrew, end to end, on your machine.** Word-level Hebrew transcription (ivrit.ai), right-to-left
-  captions in the right order, karaoke, and fillers like אממ removed with captions re-timed. Descript and
-  OpusClip don't support Hebrew; Premiere and Resolve can't transcribe it.
+- **Any language, on your machine, right-to-left included.** Word-level transcription, karaoke,
+  fillers ("um", "uh", "אממ") removed with captions re-timed, and graphics that follow the reading
+  direction. Hebrew gets a dedicated model (ivrit.ai), where Descript and OpusClip don't support it
+  and Premiere and Resolve can't transcribe it.
 - **It decides like an editor, and asks before acting.** Parts by meaning, a story with a reason for
   every part, your approval before rendering, and a QA check after.
-- **Promo-grade, not just cuts.** Brand, Hebrew motion graphics and infographics, b-roll matched to the
+- **Promo-grade, not just cuts.** Brand, motion graphics and infographics (right-to-left when the language is), b-roll matched to the
   words, music under speech, narration from a script, versions and shorts, all from one edit.
 - **Hand-off both ways.** A review page anyone can open, and an FCPXML / EDL / OTIO timeline for
   Premiere, Resolve or Final Cut. No other agent tool surveyed has either.
@@ -90,13 +93,14 @@ compares with OpenMontage, video-use, Kinocut, Descript, OpusClip and others:
 - macOS or Linux, Python 3.10+
 - **FFmpeg with libass**: `brew install ffmpeg-full` on macOS. The plain `ffmpeg` formula
   cannot burn captions.
-- **whisper.cpp** (comes with ffmpeg-full) and an [ivrit.ai](https://huggingface.co/ivrit-ai)
-  Hebrew model, found automatically in the Hugging Face cache:
+- **whisper.cpp** (comes with ffmpeg-full) and a model, found automatically in the Hugging Face cache:
   ```bash
   pip install -U huggingface_hub
-  hf download ivrit-ai/whisper-large-v3-turbo-ggml ggml-model.bin   # 1.5 GB, fast
-  hf download ivrit-ai/whisper-large-v3-ggml ggml-model.bin         # 2.9 GB, more accurate (preferred when present)
+  hf download ggerganov/whisper.cpp ggml-large-v3-turbo.bin         # 1.6 GB, every language
+  hf download ivrit-ai/whisper-large-v3-turbo-ggml ggml-model.bin   # 1.5 GB, Hebrew (only if you work in Hebrew)
   ```
+  Hebrew uses the ivrit.ai model, which is far better at Hebrew but answers in Hebrew whatever is
+  spoken, so every other language, and language detection, needs the multilingual one.
 - **Node.js 22+** and Chrome, for motion graphics (HyperFrames runs through `npx`)
 - Optional: an API key for a voice-over provider, in `.env` (gitignored)
 - [Claude Code](https://claude.com/claude-code)
@@ -114,7 +118,9 @@ claude
 Then, in Claude Code:
 
 > Make a project called *trip* from ~/Movies/trip, cut it by topic into a 2-minute story,
-> take out the ums, and add Hebrew karaoke captions.
+> take out the ums, and add karaoke captions.
+
+> הכן פרויקט בשם *טיול* מ-~/Movies/trip, בעברית, עם כתוביות קריוקי מימין לשמאל.
 
 > Make a 45-second promo for ACME from ~/Footage/acme: the CEO interview, b-roll of the factory,
 > our logo and colours, a chart of customers by year, music, and a Reels version.
@@ -128,7 +134,7 @@ is on an external drive or in a cloud folder, or when you plan to move the origi
 
 ## What you can ask
 
-Say it in your own words, in Hebrew or English. These are examples, not fixed commands.
+Say it in your own words, in any language. These are examples, not fixed commands.
 Claude asks only when the answer changes the result, and otherwise picks a sensible default
 and tells you which.
 
@@ -137,6 +143,7 @@ and tells you which.
 | Ask | What happens |
 |---|---|
 | "Start a project called *trip* from ~/Movies/trip" | links every video in the folder into `projects/trip/` |
+| "…it's in Hebrew" | `--language he`: stored in `project.json`, so every step follows it |
 | "…from these two files: a.mov, b.mp4" | links just those files |
 | "Copy them in, they're on an external drive" | copies instead of linking (also for iCloud / Google Drive, or originals you will move) |
 | "Add clip3.mp4 to the trip project" | adds a source to an existing project |
@@ -145,9 +152,9 @@ and tells you which.
 
 | Ask | What happens |
 |---|---|
-| "Transcribe it" | Hebrew transcript with a time for every word |
+| "Transcribe it" | a transcript with a time for every word; the language is detected and remembered |
 | "Transcribe it — the speakers are Rabbi Cohen and Dana, it's about Shabbat candles" | names and terms go in as a prompt, so they are spelled right |
-| "It's in English" | transcribes in another language |
+| "It's in Spanish" / "the project is in Hebrew" | sets the project's language; transcription, cleaning, captions, graphics and voice follow it |
 | "Transcribe again" | redoes it (after changing the model or the prompt) |
 | "Show me the transcript" / "…with word times" | prints it by clip and time; fillers are marked |
 | "What's in the footage?" / "There's no talking, it's travel footage" | contact sheets and scene changes; Claude describes each shot |
@@ -199,7 +206,7 @@ and tells you which.
 
 | Ask | What happens |
 |---|---|
-| "Add Hebrew captions" | burned in, right-to-left, two lines at most |
+| "Add captions" | burned in, two lines at most, right-to-left for Hebrew or Arabic |
 | "Karaoke" / "highlight each word as it's spoken" | word-by-word highlight from real timings |
 | "One bold word at a time, like TikTok" | karaoke `word` style |
 | "Bigger" / "at the top" / "font Heebo" | size, position, font |
@@ -306,7 +313,7 @@ and tells you which.
 .agents/skills/                      HyperFrames skills (Apache-2.0), linked into .claude/skills/
 templates/motion/                    motion graphics templates: lower-third, title, end-card, stat, bar-chart
 tools/vf.py                          the CLI the skill drives (+ vf_motion.py, vf_voice.py, vf_review.py, vf_vision.py)
-tools/fillers.he.txt                 Hebrew hesitation sounds that "clean" removes
+tools/fillers.<lang>.txt             hesitation sounds that "clean" removes, per language (en, he, es, fr, de)
 docs/                                full documentation, English and Hebrew
 projects/<name>/                     your projects: gitignored, never committed
 ```
@@ -314,7 +321,7 @@ projects/<name>/                     your projects: gitignored, never committed
 `tools/vf.py` also works on its own (every command: [docs/cli.md](docs/cli.md)):
 
 ```bash
-python3 tools/vf.py new demo ~/Movies/trip       # a folder or files; --copy to copy
+python3 tools/vf.py new demo ~/Movies/trip       # a folder or files; --copy to copy; --language en|he|…
 python3 tools/vf.py transcribe demo              # word timings
 python3 tools/vf.py frames demo                  # contact sheets + scenes, for footage without speech
 python3 tools/vf.py watch demo                   # optional: a vision model's shot log (docs/vision.md)

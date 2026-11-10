@@ -3,7 +3,8 @@
 # Motion graphics
 
 Graphics are HTML compositions rendered to video by [HyperFrames](https://github.com/heygen-com/hyperframes)
-(Apache-2.0, pinned to 0.9.27). Animation uses GSAP. Text is right-to-left by default. A graphic
+(Apache-2.0, pinned to 0.9.27). Animation uses GSAP. Text follows the project's language: left to right, or right to left for Hebrew, Arabic and
+Persian (titles align to the reading side, lower thirds sit on it, charts run from it). A graphic
 is either a **card** (a full-screen part of the edit) or an **overlay** (rendered with a
 transparent background and composited over the footage).
 
@@ -11,7 +12,7 @@ transparent background and composited over the footage).
 
 | Template | Use | Variables (`vars`) | Default length |
 |---|---|---|---|
-| `lower-third` | a speaker's name and role, over footage | `name`, `role`, `side` (`right` / `left`) | 5 s |
+| `lower-third` | a speaker's name and role, over footage | `name`, `role`, `side` (`auto`: the reading side / `right` / `left`) | 5 s |
 | `title` | opening or chapter card | `title`, `subtitle`, `kicker` (small line above), `opaque` (false = overlay) | 4 s |
 | `end-card` | call to action, contact, logo | `cta`, `line1`, `line2`, `line3` (the logo comes from the brand) | 5 s |
 | `stat` | one number that counts up | `value`, `prefix`, `suffix`, `decimals`, `label`, `position` (`center` / `right` / `left`), `opaque` | 4 s |
@@ -33,8 +34,8 @@ the brand. `duration` (in the spec, not in `vars`) sets the length; the exit ani
 
 `primary` becomes the accent, `text` the text colour, and `background` the panels and cards. The
 logo appears on the end card and, with an overlay `{"logo": true}`, on the video. `font_file`
-is embedded in every graphic. Without it, graphics use an installed Hebrew font (Heebo,
-Assistant, Arial Hebrew, Noto Sans Hebrew). Captions use `font`. This is ffmpeg-skill's brand
+is embedded in every graphic. Without it, graphics use an installed font that suits the
+language (Inter or Helvetica Neue; for Hebrew Heebo, Assistant, Arial Hebrew; for Arabic Noto Sans Arabic). Captions use `font`. This is ffmpeg-skill's brand
 format, so the same file also styles its graphics and captions.
 
 ## Sizes
@@ -64,7 +65,7 @@ To plug into vf.py, a composition keeps these conventions:
 2. Swappable text and colours as variables (`data-composition-variables` on `<html>`, read with
    `window.__hyperframes.getVariables()`).
 3. A transparent `html, body` background if it will be an overlay.
-4. The font family `"VF Hebrew"` (vf.py points it at the brand font).
+4. The font family `"VF Sans"` (vf.py points it at the brand font).
 5. A logo slot as `<!--VF_LOGO-->`, which vf.py replaces with the brand logo.
 
 Then use it like a built-in: `{"template": "<dir>", "vars": {...}, "duration": 6}`. A graphic worth

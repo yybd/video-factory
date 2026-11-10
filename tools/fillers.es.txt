@@ -1,0 +1,11 @@
+# Spanish hesitation sounds. "este" (also "this") is left out on purpose.
+eh
+Eh
+ehh
+Ehh
+em
+Em
+emm
+Emm
+mmm
+Mmm

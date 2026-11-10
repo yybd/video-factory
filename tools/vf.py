@@ -74,18 +74,42 @@ def tool_env() -> dict:
     return env
 
 
-def whisper_model() -> Path | None:
-    """A whisper.cpp ggml model. VF_WHISPER_MODEL wins; otherwise the ivrit.ai Hebrew models
-    in the Hugging Face cache (large-v3 first: more accurate; turbo: ~3x faster)."""
-    env = os.environ.get("VF_WHISPER_MODEL")
-    if env:
-        return Path(env).expanduser()
+HEBREW_MODELS = [("models--ivrit-ai--whisper-large-v3-ggml", "ggml-model.bin"),
+                 ("models--ivrit-ai--whisper-large-v3-turbo-ggml", "ggml-model.bin")]
+GENERAL_MODELS = [("models--ggerganov--whisper.cpp", "ggml-large-v3-turbo.bin"),
+                  ("models--ggerganov--whisper.cpp", "ggml-large-v3.bin"),
+                  ("models--ggerganov--whisper.cpp", "ggml-medium.bin")]
+
+
+def _cached(models: list[tuple[str, str]]) -> Path | None:
     hub = Path(os.environ.get("HF_HOME", Path.home() / ".cache" / "huggingface")) / "hub"
-    for repo in ("models--ivrit-ai--whisper-large-v3-ggml", "models--ivrit-ai--whisper-large-v3-turbo-ggml"):
-        hits = sorted(glob.glob(str(hub / repo / "snapshots" / "*" / "ggml-model.bin")))
+    for repo, fname in models:
+        hits = sorted(glob.glob(str(hub / repo / "snapshots" / "*" / fname)))
         if hits:
             return Path(hits[-1])
     return None
+
+
+def hebrew_model() -> Path | None:
+    """VF_WHISPER_MODEL_HE, else ivrit.ai in the Hugging Face cache (large-v3 first; turbo is ~3x faster)."""
+    env = os.environ.get("VF_WHISPER_MODEL_HE")
+    return Path(env).expanduser() if env else _cached(HEBREW_MODELS)
+
+
+def general_model() -> Path | None:
+    """VF_WHISPER_MODEL, else OpenAI's multilingual large-v3(-turbo) from ggerganov/whisper.cpp in the cache."""
+    env = os.environ.get("VF_WHISPER_MODEL")
+    return Path(env).expanduser() if env else _cached(GENERAL_MODELS)
+
+
+def whisper_model(lang: str = "auto") -> tuple[Path | None, str]:
+    """The model for a language, and a note when it is a second choice. Hebrew gets the ivrit.ai
+    fine-tune (far better Hebrew); every other language, and detection, the multilingual model."""
+    he, gen = hebrew_model(), general_model()
+    if lang == "he":
+        return (he, "") if he else (gen, "no Hebrew model (ivrit.ai) found — using the multilingual one" if gen else "")
+    # never the ivrit.ai model for another language: it answers in Hebrew whatever is spoken
+    return gen, ""
 
 
 def dtw_preset(model: Path) -> str | None:
@@ -197,7 +221,7 @@ def load_fillers(lang: str) -> set[str]:
 
 # ---------------------------------------------------------------- transcription
 
-def whisper_cpp_transcribe(path: Path, workdir: Path, language: str, prompt: str, model: Path) -> list[dict]:
+def whisper_cpp_transcribe(path: Path, workdir: Path, language: str, prompt: str, model: Path) -> tuple[list[dict], str]:
     """whisper.cpp with DTW token timestamps -> segments with words."""
     cli = shutil.which("whisper-cli") or shutil.which("whisper-cpp")
     if not cli:
@@ -215,6 +239,7 @@ def whisper_cpp_transcribe(path: Path, workdir: Path, language: str, prompt: str
         sys.stderr.write(r.stderr[-2000:])
         sys.exit("whisper.cpp failed")
     data = json.loads((workdir / "out.json").read_text(encoding="utf-8"))
+    detected = (data.get("result") or {}).get("language") or language
     segs = []
     for s in data.get("transcription", []):
         text = s["text"].strip()
@@ -223,7 +248,7 @@ def whisper_cpp_transcribe(path: Path, workdir: Path, language: str, prompt: str
         seg_start, seg_end = s["offsets"]["from"] / 1000.0, s["offsets"]["to"] / 1000.0
         segs.append({"start": seg_start, "end": seg_end, "text": text,
                      "words": tokens_to_words(s.get("tokens", []), seg_start, seg_end)})
-    return segs
+    return segs, detected
 
 
 def tokens_to_words(tokens: list[dict], seg_start: float, seg_end: float) -> list[dict]:
@@ -275,10 +300,13 @@ def cmd_doctor(_a) -> None:
     ok &= has_skill
     print(f"ffmpeg-skill: {'ok' if has_skill else 'MISSING — npx ffmpeg-skill --project'}")
     cli = shutil.which("whisper-cli")
-    m = whisper_model()
+    gen, he = general_model(), hebrew_model()
     print(f"whisper-cli : {cli or 'MISSING — brew install whisper-cpp'}")
-    print(f"model       : {m or 'MISSING — see README (ivrit.ai ggml model)'}"
-          + (f"  [dtw {dtw_preset(m)}]" if m else ""))
+    print(f"model (any) : {gen or 'not found — multilingual large-v3-turbo, see docs/setup.md'}"
+          + (f"  [dtw {dtw_preset(gen)}]" if gen else ""))
+    print(f"model (he)  : {he or 'not found — optional, ivrit.ai, for Hebrew'}"
+          + (f"  [dtw {dtw_preset(he)}]" if he else ""))
+    m = gen or he
     if not (cli and m and m.exists()):
         ok = False
         print("no transcription engine: whisper-cli and a model are both needed (docs/setup.md)")
@@ -377,17 +405,31 @@ def cmd_new(a) -> None:
         else:
             dst.symlink_to(v)  # default: no duplicate footage; the original is never written to
             print(f"  source {dst.name} -> {v}")
+    if a.language:
+        import vf_lang
+        vf_lang.remember(proj, a.language)
+        print(f"  language: {vf_lang.name(a.language)} ({a.language})")
     print(proj)
 
 
 def cmd_transcribe(a) -> None:
     """Writes transcript/<src>.json = {"meta", "segments": [{start, end, text, words}]} in SECONDS,
     plus <src>.srt for reading."""
+    import vf_lang
     proj = project_dir(a.project)
-    model = Path(a.model).expanduser() if a.model else whisper_model()
+    lang = vf_lang.for_transcription(proj, a.language)
+    model, note = (Path(a.model).expanduser(), "") if a.model else whisper_model(lang)
+    if not model and lang != "he" and hebrew_model():
+        sys.exit(("cannot detect the language" if lang == "auto" else f"cannot transcribe {vf_lang.name(lang)}") +
+                 ": only the Hebrew model (ivrit.ai) is installed, and it answers in Hebrew whatever is spoken.\n"
+                 "  Install the multilingual model (docs/setup.md), or, if this footage is Hebrew:\n"
+                 f"  vf.py transcribe {proj.name} --language he")
     if not (model and model.exists() and shutil.which("whisper-cli")):
-        sys.exit("no transcription engine: install whisper.cpp and an ivrit.ai ggml model "
-                 "(docs/setup.md), or point VF_WHISPER_MODEL at a ggml model")
+        sys.exit("no transcription engine: install whisper.cpp and a ggml model "
+                 "(docs/setup.md), or point VF_WHISPER_MODEL at one")
+    if note:
+        print(f"  note: {note}")
+    print(f"  language: {lang if lang != 'auto' else 'detect'}")
     for name, path in sources(proj).items():
         out_json = proj / "transcript" / f"{name}.json"
         if out_json.exists() and not a.force:
@@ -396,9 +438,18 @@ def cmd_transcribe(a) -> None:
         tmp = proj / "transcript" / f".{name}.raw"
         tmp.mkdir(exist_ok=True)
         engine = f"whisper.cpp {model.parent.parent.parent.name if 'snapshots' in str(model) else model.name}"
-        segs = whisper_cpp_transcribe(path.resolve(), tmp, a.language, a.prompt, model)
+        segs, detected = whisper_cpp_transcribe(path.resolve(), tmp, lang, a.prompt, model)
         shutil.rmtree(tmp)
-        data = {"meta": {"source": path.name, "engine": engine, "language": a.language, "units": "seconds",
+        if lang != "auto" and vf_lang.stored(proj) in ("", "auto"):
+            vf_lang.remember(proj, lang)
+        if lang == "auto" and detected != "auto":
+            print(f"  {name}: detected {vf_lang.name(detected)} ({detected})")
+            if detected == "he" and hebrew_model() and model != hebrew_model() and not a.model:
+                print("  note: Hebrew is far better with the ivrit.ai model — "
+                      f"vf.py transcribe {proj.name} --language he --force")
+            if not vf_lang.stored(proj) or vf_lang.stored(proj) == "auto":
+                vf_lang.remember(proj, detected)
+        data = {"meta": {"source": path.name, "engine": engine, "language": detected, "units": "seconds",
                          "word_timings": any(s["words"] for s in segs)},
                 "segments": segs}
         out_json.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
@@ -408,8 +459,9 @@ def cmd_transcribe(a) -> None:
 
 
 def cmd_transcript(a) -> None:
+    import vf_lang
     proj = project_dir(a.project)
-    fillers = load_fillers("he")
+    fillers = load_fillers(vf_lang.resolve(proj))
     for name in sources(proj):
         rows = []
         for i, s in enumerate(load_transcript(proj, name)):
@@ -515,7 +567,10 @@ def cmd_reference(a) -> None:
     print(f"  then write {out}/style.md and carry it into story.json")
 
 
-HOOK_WORDS_HE = {"סוד", "טעות", "טעויות", "הכי", "אף", "תמיד", "לעולם", "למה", "איך", "מה", "שימו", "חשוב",
+HOOK_WORDS = {"en": {"secret", "mistake", "mistakes", "never", "always", "why", "how", "what", "stop", "nobody",
+                     "everyone", "truth", "actually", "imagine", "wrong", "problem", "solution", "trick", "reason",
+                     "important", "surprising", "simple", "biggest", "worst", "best", "without"}}
+HOOK_WORDS["he"] = {"סוד", "טעות", "טעויות", "הכי", "אף", "תמיד", "לעולם", "למה", "איך", "מה", "שימו", "חשוב",
                  "בעצם", "האמת", "מפתיע", "פשוט", "צריך", "אסור", "חייבים", "כולם", "אף אחד", "רגע", "דמיינו",
                  "מכירים", "טריק", "שיטה", "סיבה", "הבעיה", "הפתרון", "בלי"}
 
@@ -524,8 +579,11 @@ def cmd_candidates(a) -> None:
     """Moments that could stand alone as a short: windows of whole transcript segments, scored on
     signals a clip needs (a hook up front, numbers, energy, a complete ending). A shortlist for
     Claude to read and judge — the score is a proxy, the decision is not made here."""
+    import vf_lang
     proj = project_dir(a.project)
-    fillers = load_fillers(a.language)
+    lang = vf_lang.resolve(proj, a.language)
+    fillers = load_fillers(lang)
+    hook_words = {norm_word(w) for w in HOOK_WORDS.get(lang, set())}
     rows = []
     for src in sources(proj):
         segs = load_transcript(proj, src)
@@ -541,7 +599,7 @@ def cmd_candidates(a) -> None:
                 first = segs[i]["text"]
                 first_words = {norm_word(w) for w in first.split()}
                 hook = (2 if "?" in first else 0) + (2 if re.search(r"\d", first) else 0) \
-                    + 1.5 * len(first_words & HOOK_WORDS_HE) + (1 if len(first.split()) <= 8 else 0)
+                    + 1.5 * len({w.lower() for w in first_words} & hook_words) + (1 if len(first.split()) <= 8 else 0)
                 numbers = len(re.findall(r"\d+%?", text))
                 rate = len(words) / max(1.0, en - st)
                 filler_share = sum(1 for w in words if norm_word(w["word"] if isinstance(w, dict) else w) in fillers) / max(1, len(words))
@@ -582,6 +640,8 @@ def cmd_clips(a) -> None:
     clips = [c for c in cfg.get("clips", []) if not only or c["id"] in only]
     if not clips:
         sys.exit("clips.json has no clips" + (f" matching {a.only}" if only else ""))
+    import vf_lang
+    clip_lang = vf_lang.resolve(proj)
     brand_logo = (proj / "brand.json").exists() and json.loads((proj / "brand.json").read_text(encoding="utf-8")).get("logo")
     results = []
     for c in clips:
@@ -593,7 +653,7 @@ def cmd_clips(a) -> None:
         story = {"title": c.get("title", c["id"]),
                  "output": {"width": style["width"], "height": style["height"], "fps": style.get("fps", 30)},
                  "fit": style["fit"], "transition": {"type": "fade", "duration": 0.3}, "parts": parts,
-                 "captions": {"enabled": True, "language": style.get("language", "he"), "karaoke": True,
+                 "captions": {"enabled": True, "language": style.get("language") or clip_lang, "karaoke": True,
                               "karaoke_style": style["karaoke_style"], "size": style["caption_size"],
                               "position": style["caption_position"], "cues": cfg.get("cues", [])},
                  "overlays": [], "loudness": style.get("loudness", -14)}
@@ -972,7 +1032,8 @@ def fps_arg(fps: float) -> str:
 
 def plan_parts(proj: Path, story: dict, srcs: dict[str, Path]) -> list[dict]:
     """Snap, clean and key every footage part (no rendering). Motion parts pass through."""
-    fillers = load_fillers(story.get("captions", {}).get("language", "he"))
+    import vf_lang
+    fillers = load_fillers(story.get("captions", {}).get("language") or vf_lang.resolve(proj))
     items = []
     for p in story["parts"]:
         p = dict(p)
@@ -1302,11 +1363,12 @@ def render_story(proj: Path, story: dict, name: str, a) -> list[str]:
         if cues:
             srt = write_caption_files(proj, cues, "captions")
             nxt = stage(stages, "8-captions")
-            lang = cap.get("language", "he")
+            import vf_lang
+            lang = cap.get("language") or vf_lang.resolve(proj)
             args = [cur, "--srt", f"{srt}:{lang}", "--language", lang, "--position", cap.get("position", "bottom"),
                     "--max-lines", str(cap.get("max_lines", 2)), "-o", nxt, "--overwrite", "--json-brief"]
             brand = vf_motion.load_brand(proj)
-            font = cap.get("font") or brand.get("font") or ("Arial Hebrew" if sys.platform == "darwin" else "")
+            font = cap.get("font") or brand.get("font") or ("Arial Hebrew" if sys.platform == "darwin" and lang == "he" else "")
             if font:  # elsewhere caption.py picks an installed font that has the script's glyphs
                 args += ["--font", font]
             if brand_file.exists():
@@ -1455,27 +1517,30 @@ def cmd_voice(a) -> None:
     if not script.exists():
         sys.exit(f"{script} not found — write the narration there, one paragraph per beat")
     only = [int(x) for x in a.only.split(",")] if a.only else None
-    vo = vf_voice.make_voiceover(proj, script, a.provider, a.voice, a.language, a.model, a.speed, a.gap, only, ffbin)
+    import vf_lang
+    lang = vf_lang.resolve(proj, a.language)
+    vo = vf_voice.make_voiceover(proj, script, a.provider, a.voice, lang, a.model, a.speed, a.gap, only, ffbin)
     meta = json.loads((proj / "voice" / "beats.json").read_text(encoding="utf-8"))
     for b in meta["beats"]:
         print(f"  beat {b['n']}: {fmt(b['start'])}-{fmt(b['end'])} ({b['end'] - b['start']:.2f}s)  {b['text'][:70]}")
     print(f"  total {meta['total']:.2f}s -> {vo}")
     # words for captions and karaoke: transcribe the narration itself
-    model = whisper_model()
+    model, _ = whisper_model(lang)
     if model and model.exists() and shutil.which("whisper-cli"):
         tmp = proj / "transcript" / ".voiceover.raw"
         tmp.mkdir(parents=True, exist_ok=True)
-        segs = whisper_cpp_transcribe(vo, tmp, a.language, "", model)
+        segs, _ = whisper_cpp_transcribe(vo, tmp, lang, "", model)
         shutil.rmtree(tmp)
         fixed, total = script_spelling(segs, meta)
         print(f"  script spelling applied to {fixed}/{total} beats (the rest keep whisper's words)")
         (proj / "transcript" / "voiceover.json").write_text(json.dumps(
-            {"meta": {"source": "voice/voiceover.wav", "engine": "whisper.cpp", "language": a.language,
+            {"meta": {"source": "voice/voiceover.wav", "engine": "whisper.cpp", "language": lang,
                       "units": "seconds", "word_timings": True}, "segments": segs}, ensure_ascii=False, indent=1),
             encoding="utf-8")
         print(f"  transcript/voiceover.json: {len(segs)} segments with word timings")
     else:
-        print("  note: no whisper.cpp model — captions cannot follow the voice-over until it is transcribed",
+        print(f"  note: no whisper.cpp model for {vf_lang.name(lang)} — captions cannot follow the voice-over "
+              "until it is transcribed (docs/setup.md)",
               file=sys.stderr)
 
 
@@ -1527,7 +1592,9 @@ def cmd_review(a) -> None:
     if not video.exists():
         sys.exit(f"{video} not found — render it first")
     story = read_json(proj / "story.json", "story.json") if (proj / "story.json").exists() else {}
-    page = vf_review.write_review(proj, video, story.get("title", proj.name), a.lang)
+    import vf_lang
+    page_lang = a.lang or ("he" if vf_lang.resolve(proj) == "he" else "en")
+    page = vf_review.write_review(proj, video, story.get("title", proj.name), page_lang)
     print(f"  {page}\n  send the client the renders/ folder (or both files); notes come back as text")
 
 
@@ -1644,11 +1711,13 @@ def main() -> None:
     p.add_argument("--copy", action="store_true",
                    help="copy the sources in instead of linking (external drive, cloud folder, "
                         "or originals you will move)")
+    p.add_argument("--language", default="", help="the project's language: en, he, es… (default: detected when transcribing)")
     p.set_defaults(fn=cmd_new)
 
-    p = sub.add_parser("transcribe"); p.add_argument("project"); p.add_argument("--language", default="he")
+    p = sub.add_parser("transcribe"); p.add_argument("project")
+    p.add_argument("--language", default="", help="en, he, es… (default: the project's, else detect)")
     p.add_argument("--prompt", default="", help="names and terms, as a short sentence")
-    p.add_argument("--model", default="", help="a whisper.cpp ggml model (default: VF_WHISPER_MODEL / ivrit.ai)")
+    p.add_argument("--model", default="", help="a whisper.cpp ggml model (default: ivrit.ai for Hebrew, multilingual otherwise)")
     p.add_argument("--force", action="store_true"); p.set_defaults(fn=cmd_transcribe)
 
     p = sub.add_parser("transcript"); p.add_argument("project")
@@ -1667,7 +1736,7 @@ def main() -> None:
 
     p = sub.add_parser("candidates", help="moments that could stand alone as shorts, ranked for Claude to judge")
     p.add_argument("project"); p.add_argument("--min", type=float, default=15); p.add_argument("--max", type=float, default=60)
-    p.add_argument("--top", type=int, default=12); p.add_argument("--language", default="he")
+    p.add_argument("--top", type=int, default=12); p.add_argument("--language", default="")
     p.set_defaults(fn=cmd_candidates)
 
     p = sub.add_parser("clips", help="render clips.json as vertical shorts")
@@ -1692,7 +1761,7 @@ def main() -> None:
                    choices=["elevenlabs", "azure", "google", "openai", "say"],
                    required=sys.platform != "darwin")
     p.add_argument("--voice", default=""); p.add_argument("--model", default="")
-    p.add_argument("--language", default="he"); p.add_argument("--speed", type=float, default=1.0)
+    p.add_argument("--language", default="", help="default: the project's"); p.add_argument("--speed", type=float, default=1.0)
     p.add_argument("--gap", type=float, default=0.6, help="seconds of silence between beats")
     p.add_argument("--only", default="", help="re-voice only these beats, e.g. 2,5")
     p.set_defaults(fn=cmd_voice)
@@ -1703,7 +1772,7 @@ def main() -> None:
     p = sub.add_parser("review", help="video + visual timeline + notes, one static page next to the render")
     p.add_argument("project"); p.add_argument("--version", default="")
     p.add_argument("--draft", action="store_true", help="the draft render (or <version>_draft)")
-    p.add_argument("--lang", default="he", choices=["he", "en"], help="the page's starting language (it has a toggle)")
+    p.add_argument("--lang", default="", choices=["", "he", "en"], help="the page's starting language (default: Hebrew for a Hebrew project, else English; it has a toggle)")
     p.set_defaults(fn=cmd_review)
 
     p = sub.add_parser("watch", help="a vision model looks and suggests: shot log, clip scores, render QA")

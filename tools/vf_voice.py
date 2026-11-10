@@ -4,11 +4,12 @@ The script is projects/<name>/script.md — one paragraph per beat (blank line b
 start with '#' or '>' are notes for the editor and are not read aloud.
 
 Providers (API keys from the environment or a .env file in the repo root or the project):
-  elevenlabs  ELEVENLABS_API_KEY   --voice <voice id>          model eleven_v3 (Hebrew among 70+ languages)
-  azure       AZURE_SPEECH_KEY + AZURE_SPEECH_REGION   --voice he-IL-HilaNeural | he-IL-AvriNeural
-  google      GOOGLE_TTS_API_KEY   --voice he-IL-Wavenet-A … (any he-IL voice)
+  elevenlabs  ELEVENLABS_API_KEY   --voice <voice id>          model eleven_v3 (70+ languages)
+  azure       AZURE_SPEECH_KEY + AZURE_SPEECH_REGION   --voice en-US-JennyNeural, he-IL-HilaNeural …
+  google      GOOGLE_TTS_API_KEY   --voice en-US-Neural2-F, he-IL-Wavenet-A … (any voice of the language)
   openai      OPENAI_API_KEY       --voice alloy | nova | …     model gpt-4o-mini-tts
-  say         (macOS only, free)   --voice Carmit               a scratch voice to time the edit
+  say         (macOS only, free)   --voice Samantha, Carmit …  a scratch voice to time the edit
+                                   (default: a voice for the project's language)
 
 Writes voice/beat_NN.wav, voice/voiceover.wav (beats joined with a pause) and voice/beats.json.
 """
@@ -104,7 +105,9 @@ def synth(provider: str, text: str, voice: str, out: Path, lang: str, model: str
         out.with_suffix(".wav").write_bytes(audio)
     elif provider == "google":
         key = need("GOOGLE_TTS_API_KEY", provider)
-        voice = voice or "he-IL-Wavenet-A"
+        voice = voice or ("he-IL-Wavenet-A" if lang == "he" else "")
+        if not voice:
+            sys.exit(f"google: pass --voice for language {lang!r} (e.g. en-US-Neural2-F)")
         body = {"input": {"text": text}, "voice": {"languageCode": "-".join(voice.split("-")[:2]), "name": voice},
                 "audioConfig": {"audioEncoding": "LINEAR16", "sampleRateHertz": 48000, "speakingRate": speed}}
         data = json.loads(_post(f"https://texttospeech.googleapis.com/v1/text:synthesize?key={key}",
@@ -114,15 +117,18 @@ def synth(provider: str, text: str, voice: str, out: Path, lang: str, model: str
         key = need("OPENAI_API_KEY", provider)
         body = {"model": model or "gpt-4o-mini-tts", "voice": voice or "alloy", "input": text,
                 "response_format": "wav", "speed": speed}
-        if lang == "he":
-            body["instructions"] = "Speak natural, fluent Modern Hebrew with a warm, professional narrator tone."
+        import vf_lang
+        body["instructions"] = (f"Speak natural, fluent {'Modern Hebrew' if lang == 'he' else vf_lang.name(lang)} "
+                                f"with a warm, professional narrator tone.")
         audio = _post("https://api.openai.com/v1/audio/speech", json.dumps(body).encode(),
                       {"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
         out.with_suffix(".wav").write_bytes(audio)
     elif provider == "say":
         if not shutil.which("say"):
             sys.exit("say: macOS only — pick an API provider")
-        cmd = ["say", "-v", voice or "Carmit", "-o", str(out.with_suffix(".aiff"))]
+        import vf_lang
+        voice = voice or vf_lang.SAY_VOICES.get(lang.split("-")[0], "")
+        cmd = ["say", *(["-v", voice] if voice else []), "-o", str(out.with_suffix(".aiff"))]
         if speed != 1.0:
             cmd += ["-r", str(int(175 * speed))]
         subprocess.run(cmd + [text], check=True)

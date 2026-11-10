@@ -9,7 +9,8 @@
 | Python 3.10+ | `tools/vf.py` and ffmpeg-skill (standard library only) | preinstalled / `brew install python` |
 | FFmpeg **with libass** | cutting, joining, burning captions | `brew install ffmpeg-full` (keg-only; `vf.py` finds it) |
 | whisper.cpp | transcription with word timings | comes with ffmpeg-full, or `brew install whisper-cpp` |
-| An ivrit.ai ggml model | accurate Hebrew | `hf download ivrit-ai/whisper-large-v3-ggml ggml-model.bin` (2.9 GB) or `…-turbo-ggml` (1.5 GB, faster) |
+| The multilingual ggml model | every language, and language detection | `hf download ggerganov/whisper.cpp ggml-large-v3-turbo.bin` (1.6 GB) |
+| An ivrit.ai ggml model (Hebrew only) | accurate Hebrew | `hf download ivrit-ai/whisper-large-v3-ggml ggml-model.bin` (2.9 GB) or `…-turbo-ggml` (1.5 GB, faster) |
 | Node.js 22+ | motion graphics (HyperFrames, run with `npx`) | `brew install node` |
 | Google Chrome | HyperFrames renders HTML in headless Chrome | usually already installed; HyperFrames can fetch its own |
 | Claude Code | the orchestrator | [claude.com/claude-code](https://claude.com/claude-code) |
@@ -21,11 +22,22 @@ usually has libass. Check everything with:
 python3 tools/vf.py doctor
 ```
 
+## Language
+
+Every project has one language, in `projects/<name>/project.json`. Set it with
+`vf.py new <name> … --language es`, or let the first transcription detect it (that needs the
+multilingual model). Transcription, filler removal, captions, the direction of graphics (right to left
+for Hebrew, Arabic, Persian…), the review page and the voice-over all follow it. A flag on one
+command overrides it for that run. With only the ivrit.ai model installed, say the language: it
+cannot detect one.
+
 ## Environment variables
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `VF_WHISPER_MODEL` | ivrit.ai model in the Hugging Face cache | path to any whisper.cpp ggml model |
+| `VF_LANGUAGE` | — (detect) | the language of new projects when `--language` is not given: `en`, `he`, `es`… |
+| `VF_WHISPER_MODEL` | multilingual large-v3-turbo in the Hugging Face cache | the model for every language but Hebrew, and for detection |
+| `VF_WHISPER_MODEL_HE` | ivrit.ai model in the Hugging Face cache | the model for Hebrew |
 | `VF_WHISPER_DTW` | from the model name | DTW alignment preset if the name does not say (`large.v3`, `large.v3.turbo`, …) |
 | `VF_FFMPEG_BIN` | Homebrew's ffmpeg-full | folder holding `ffmpeg` and `ffprobe` with libass |
 | `HYPERFRAMES_NO_TELEMETRY` | `1` (set in `.claude/settings.json`) | keeps HyperFrames from sending usage events |
@@ -60,9 +72,10 @@ Its Gemini engine uploads the video to Google, so keep it away from client foota
 | Symptom | Cause / fix |
 |---|---|
 | `filter subtitles MISSING` in doctor | plain ffmpeg — `brew install ffmpeg-full` |
-| `no transcription engine` | install whisper.cpp and an ivrit.ai model, or set `VF_WHISPER_MODEL` |
+| `no transcription engine` | install whisper.cpp and a model, or set `VF_WHISPER_MODEL` |
+| `cannot transcribe English: only the Hebrew model…` | the ivrit.ai model answers in Hebrew whatever is spoken: install the multilingual model, or say `--language he` if the footage is Hebrew |
 | `… is a cloud placeholder` | the file is in iCloud / Google Drive and not downloaded — download it, or use `--copy` after downloading |
 | `HyperFrames render failed` | run the `npx hyperframes@0.9.27 check <dir>` it prints; usually a template edit broke the HTML |
-| Hebrew karaoke words in reverse order | the vendored caption.py patch is missing — see `.claude/skills/ffmpeg-skill/VENDORED.md` |
+| Hebrew or Arabic karaoke words in reverse order | the vendored caption.py patch is missing — see `.claude/skills/ffmpeg-skill/VENDORED.md` |
 | A part re-cuts every render | its kept ranges changed (snapping or cleaning moved them); expected once |
 | Render is slow | use `--draft` while editing; parts and graphics are cached between renders |

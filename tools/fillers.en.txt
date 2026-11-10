@@ -1,0 +1,24 @@
+# English hesitation sounds that "clean": ["fillers"] removes (one per line; matched after
+# stripping punctuation, case-sensitive as whisper writes them). Add your own.
+um
+Um
+umm
+Umm
+uh
+Uh
+uhh
+Uhh
+uhm
+Uhm
+er
+Er
+erm
+Erm
+ah
+Ah
+hmm
+Hmm
+mm
+Mm
+mhm
+Mhm

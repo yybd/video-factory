@@ -1,6 +1,6 @@
 ---
 name: video-orchestrator
-description: 'Make a finished video from raw footage or from a script: transcribe with word timings (Hebrew first), understand footage without speech, split it into parts by meaning or at exact seconds, build a story, clean fillers and pauses, join with transitions, add brand, motion graphics and infographics (titles, lower thirds, numbers, charts, end cards), b-roll, music, a TTS voice-over, right-to-left captions with karaoke, second-language subtitles, vertical and short versions, a client review page and an editor timeline, and optionally a vision model (local or cloud) that logs shots, scores shorts and checks a render. Use for any video work in this repo — editing, promo / corporate videos (סרטון תדמית), product videos with narration, reels — e.g. "cut this by topic", "cut from 1:20 to 1:45", "make a promo", "add a lower third", "make a chart of these numbers", "narrate this script", "make a 30-second vertical version", "תחתוך לפי נושאים", "תעשה סרטון תדמית", "תוסיף כותרת תחתונה", "קריינות", "גרסה לרילס", "תוסיף כתוביות", "תוריד את האממ", "תן למודל לצפות בחומר". It plans and decides; tools/vf.py, ffmpeg-skill and HyperFrames execute.'
+description: 'Make a finished video from raw footage or from a script: transcribe with word timings in any language (Hebrew and right-to-left first-class), understand footage without speech, split it into parts by meaning or at exact seconds, build a story, clean fillers and pauses, join with transitions, add brand, motion graphics and infographics (titles, lower thirds, numbers, charts, end cards), b-roll, music, a TTS voice-over, right-to-left captions with karaoke, second-language subtitles, vertical and short versions, a client review page and an editor timeline, and optionally a vision model (local or cloud) that logs shots, scores shorts and checks a render. Use for any video work in this repo — editing, promo / corporate videos (סרטון תדמית), product videos with narration, reels — e.g. "cut this by topic", "cut from 1:20 to 1:45", "make a promo", "add a lower third", "make a chart of these numbers", "narrate this script", "make a 30-second vertical version", "תחתוך לפי נושאים", "תעשה סרטון תדמית", "תוסיף כותרת תחתונה", "קריינות", "גרסה לרילס", "תוסיף כתוביות", "תוריד את האממ", "תן למודל לצפות בחומר". It plans and decides; tools/vf.py, ffmpeg-skill and HyperFrames execute.'
 ---
 
 # video-orchestrator
@@ -69,14 +69,21 @@ external drive, iCloud / Google Drive, or originals about to move. A cloud file 
 downloaded is refused, so tell the user to download it. Several cameras of one take:
 `python3 tools/vf.py ff multicam a.mp4 b.mp4 --switch energy -o projects/<name>/source/multicam.mp4`
 first, then work from `multicam`.
+**Language**: one per project, in `project.json`. When the user says it ("it's in Spanish", "בעברית"),
+pass `--language es|he|…` to `new`; otherwise the first transcription detects and stores it.
+Transcription, fillers, captions, the direction of graphics (right to left for he / ar / fa), the
+review page and the voice-over follow it. Speak to the user in their own language whatever the
+project's language. With only the ivrit.ai model installed, detection is refused: ask for the
+language, or suggest the multilingual model (`vf.py doctor` shows which are installed).
 Ask for the goal only if it changes the edit: destination (16:9 / 9:16), length, audience.
 Picking up an existing project: `python3 tools/vf.py status <name>` first. It shows what is done
 and the next step. A project with no footage yet (script-led): `vf.py new <name>`.
 
 ### 2a. Transcribe (speech)
-`python3 tools/vf.py transcribe <name> [--prompt "names and terms"]` gives Hebrew with a time
-for every word (whisper.cpp + ivrit.ai, DTW). Put names, brands and jargon in `--prompt`. Run it
-in the background for anything over a few minutes. `--language` for other languages.
+`python3 tools/vf.py transcribe <name> [--prompt "names and terms"]` gives a time for every word
+(whisper.cpp, DTW), in the project's language: the ivrit.ai model for Hebrew (it answers in Hebrew
+whatever is spoken, so never for another language), the multilingual model for the rest. Put names,
+brands and jargon in `--prompt`. Run it in the background for anything over a few minutes.
 
 ### 2b. Look (footage without speech, or where the picture matters)
 `python3 tools/vf.py frames <name> [--every 2]` writes timecoded contact sheets and a scene list.
@@ -110,7 +117,7 @@ time: where the brand's title card, lower thirds, stats, charts, b-roll and end 
 
 ### 5. Draft
 `python3 tools/vf.py render <name> --draft` writes `renders/draft.mp4` and `draft_sheet.png`. Read the
-sheet. Check that captions are inside the frame and right-to-left, that no graphic covers a
+sheet. Check that captions are inside the frame and read in the language's direction, that no graphic covers a
 caption or a face, and that the logo does not fight a lower third.
 
 Every render ends with a QA check (length vs plan, size, streams, captions, subtitle tracks).
@@ -254,7 +261,7 @@ no story: `python3 tools/vf.py ff cut <source> --start 1:20 --end 1:45 --accurat
 ## Footage-part options (story.json)
 
 `clean: ["fillers", "pauses"]` + `max_pause` (talking heads only; fillers listed in
-`tools/fillers.he.txt`, never discourse words), `exact`, `captions: false`, and `transition` (the
+`tools/fillers.<lang>.txt`, never discourse words; a language without a file removes none), `exact`, `captions: false`, and `transition` (the
 transition into the part). The story's `transition` is the default at every junction. Captions: `karaoke`, `karaoke_style` (`sweep` | `word`),
 `font`, `size`, `position`, `animate`. Full schema: `docs/story-json.md`.
 

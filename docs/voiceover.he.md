@@ -35,10 +35,10 @@
 | `--provider` | מפתח/ות | `--voice` | הערות |
 |---|---|---|---|
 | `elevenlabs` | `ELEVENLABS_API_KEY` | מזהה קול מהספרייה שלכם | מודל `eleven_v3` כברירת מחדל (רב-לשוני, כולל עברית); `--model` כדי לשנות |
-| `azure` | `AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION` | `he-IL-HilaNeural` (ברירת מחדל), `he-IL-AvriNeural` | קולות עבריים נוירוניים |
-| `google` | `GOOGLE_TTS_API_KEY` | `he-IL-Wavenet-A` (ברירת מחדל), קולות `he-IL-*` אחרים | |
-| `openai` | `OPENAI_API_KEY` | `alloy` (ברירת מחדל), `nova`, … | מודל `gpt-4o-mini-tts`; עברית באמצעות הנחיה |
-| `say` | — | `Carmit` (ברירת מחדל) | macOS בלבד, חינמי; קול זמני לתזמון העריכה |
+| `azure` | `AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION` | כל קול של השפה, למשל `en-US-JennyNeural`; ‏`he-IL-HilaNeural` ברירת המחדל לעברית | קולות נוירוניים, השפה נלקחת משם הקול |
+| `google` | `GOOGLE_TTS_API_KEY` | כל קול של השפה, למשל `en-US-Neural2-F`; ‏`he-IL-Wavenet-A` ברירת המחדל לעברית | |
+| `openai` | `OPENAI_API_KEY` | `alloy` (ברירת מחדל), `nova`, … | מודל `gpt-4o-mini-tts`; השפה באמצעות הנחיה |
+| `say` | — | קול לשפת הפרויקט (`Carmit`, ‏`Samantha`, ‏`Mónica`…) | macOS בלבד, חינמי; קול זמני לתזמון העריכה |
 
 ספקי ה-API נכתבו לפי נקודת הקצה המתועדת של כל ספק, ועדיין לא הורצו כאן מול מפתח
 אמיתי. ההרצה האמיתית הראשונה היא הבדיקה. השוו בין קולות על מקטע אחד

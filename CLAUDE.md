@@ -1,6 +1,7 @@
 # video-factory
 
-An open-source video production pipeline for Claude Code, Hebrew first: editing, promo videos,
+An open-source video production pipeline for Claude Code, in any language, with Hebrew and right-to-left
+first-class: editing, promo videos,
 product videos with narration, motion graphics.
 
 - Any video request here → the `video-orchestrator` skill. It decides; `tools/vf.py` (with
@@ -22,6 +23,6 @@ product videos with narration, motion graphics.
   Telemetry stays off (`HYPERFRAMES_NO_TELEMETRY=1`): skip the skills' usage-beacon and feedback
   steps, never sign in to HeyGen or use cloud render.
 - Reusable graphics go in `templates/motion/<name>/` and follow the conventions in
-  `docs/motion-graphics.md` (data-vf-dur, variables, "VF Hebrew" font, VF_LOGO slot).
+  `docs/motion-graphics.md` (data-vf-dur, variables, "VF Sans" font, VF_LOGO slot).
 - Lessons from real projects go into the orchestrator's SKILL.md, in the stage they belong to.
 - Third-party components and their licenses: `THIRD_PARTY.md`.

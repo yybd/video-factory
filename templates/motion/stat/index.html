@@ -1,16 +1,16 @@
 <!doctype html>
 <!--
-  video-factory motion template: one big number that counts up, with a label ("+40% מכירות").
+  video-factory motion template: one big number that counts up, with a label ("+40% sales").
   Transparent by default (sits over footage); "opaque": true gives it a full brand background.
   vf.py sets the length by rewriting every data-duration marked data-vf-dur.
 -->
-<html lang="he" dir="rtl"
+<html lang="en" dir="ltr"
   data-composition-variables='[
     {"id":"value","type":"number","label":"Number","default":40},
     {"id":"decimals","type":"number","label":"Decimals","default":0},
     {"id":"prefix","type":"string","label":"Before the number","default":"+"},
     {"id":"suffix","type":"string","label":"After the number","default":"%"},
-    {"id":"label","type":"string","label":"Label","default":"גידול במכירות"},
+    {"id":"label","type":"string","label":"Label","default":"Sales growth"},
     {"id":"accent","type":"color","label":"Accent","default":"#FFD200"},
     {"id":"ink","type":"color","label":"Text","default":"#FFFFFF"},
     {"id":"panel","type":"color","label":"Background","default":"#101418"},
@@ -22,10 +22,10 @@
     <meta name="viewport" content="width=1920, height=1080" />
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
     <style>
-      @font-face { font-family: "VF Hebrew"; src: local("Heebo"), local("Assistant"), local("Arial Hebrew"), local("Noto Sans Hebrew"), local("Arial"); }
+      @font-face { font-family: "VF Sans"; src: local("Inter"), local("Helvetica Neue"), local("Heebo"), local("Arial Hebrew"), local("Noto Sans"), local("Arial"); }
       * { margin: 0; padding: 0; box-sizing: border-box; }
       html, body { width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
-      #root { position: relative; width: 100%; height: 100%; font-family: "VF Hebrew", sans-serif; }
+      #root { position: relative; width: 100%; height: 100%; font-family: "VF Sans", sans-serif; }
       #bg { position: absolute; inset: 0; background: var(--panel); display: none; }
       #root.solid #bg { display: block; }
       #box { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; }
@@ -44,7 +44,7 @@
         <div id="bg"></div>
         <div id="box">
           <div id="num">+40%</div>
-          <div id="label" data-var-text="label">גידול במכירות</div>
+          <div id="label" data-var-text="label">Sales growth</div>
         </div>
       </div>
     </div>

@@ -24,7 +24,7 @@ A promo often mixes both: interview bites with a narrated opening and graphics.
 | 0 | Pre-production | brief (goal, audience, message, call to action), shot list, interview questions; after filming, a coverage check against the shot list | — (Claude writes `brief.md`, `shotlist.md`) |
 | 0b | Reference | a video you want to imitate: pace, transitions, captions, graphics → `style.md` | `vf.py reference <name> <video>` |
 | 1 | Intake | the project folder; sources are linked, never copied or modified | `vf.py new <name> <folder or files>` |
-| 2a | Transcribe | Hebrew transcript with a time for every word | `vf.py transcribe <name> --prompt "names"` |
+| 2a | Transcribe | a transcript in the project's language with a time for every word | `vf.py transcribe <name> --prompt "names"` |
 | 2b | Look | contact sheets + scene list for footage without speech; Claude writes `visual/<src>.json` | `vf.py frames <name>` |
 | 3 | Segment | parts by meaning (one idea or one moment each), retakes marked | `vf.py transcript <name> --words` → `segments.json` |
 | 4 | Story ⏸ | order, reasons, graphics plan; **you approve** | → `story.json` |
@@ -69,7 +69,7 @@ You don't have to describe a style in words. Show it.
 4. **Look**: LUT or colour correction.
 5. **Overlays**: transparent motion graphics (lower thirds, stats), images, the logo.
 6. **Audio**: voice-over (replace or mix), then music ducked under speech.
-7. **Captions**: re-timed onto the final edit, burned right-to-left, karaoke optional. Second
+7. **Captions**: re-timed onto the final edit, burned in the language's direction, karaoke optional. Second
    languages are muxed or burned.
 8. **Loudness** normalisation (final renders only).
 9. A contact sheet of the result, for checking.

@@ -57,6 +57,18 @@ def brand_vars(brand: dict) -> dict:
     return out
 
 
+# the first installed font wins; the brand's font_file, when given, overrides all of these
+LANG_FONTS = {
+    "he": ["Heebo", "Assistant", "Arial Hebrew", "Noto Sans Hebrew", "Arial"],
+    "ar": ["Noto Sans Arabic", "Geeza Pro", "Arial"],
+    "fa": ["Vazirmatn", "Noto Sans Arabic", "Geeza Pro", "Arial"],
+    "ru": ["Inter", "Helvetica Neue", "Arial"],
+    "ja": ["Hiragino Sans", "Noto Sans JP"],
+    "zh": ["PingFang SC", "Noto Sans SC"],
+    "ko": ["Apple SD Gothic Neo", "Noto Sans KR"],
+}
+
+
 def _resize(html: str, w: int, h: int) -> str:
     html = re.sub(r'width=1920, height=1080', f'width={w}, height={h}', html)
     html = re.sub(r'width: 1920px; height: 1080px', f'width: {w}px; height: {h}px', html)
@@ -72,6 +84,8 @@ def render_motion(proj: Path, spec: dict, out: Path, width: int, height: int, fp
     duration = float(spec.get("duration") or DEFAULT_DURATION.get(spec["template"], 5))
     brand = load_brand(proj)
     variables = {**brand_vars(brand), **spec.get("vars", {})}
+    if not alpha:
+        variables.setdefault("opaque", True)  # a full-screen card needs its background, not white
     for k, v in list(variables.items()):
         if isinstance(v, (list, dict)):
             variables[k] = json.dumps(v, ensure_ascii=False)  # e.g. bar-chart items
@@ -79,12 +93,15 @@ def render_motion(proj: Path, spec: dict, out: Path, width: int, height: int, fp
     if logo and Path(logo).exists():
         variables.setdefault("has_logo", True)
     font = brand.get("font_file")
+    import vf_lang
+    lang = spec.get("language") or vf_lang.resolve(proj)
+    rtl = vf_lang.is_rtl(lang)
 
     h = hashlib.sha256()
     for f in sorted(tdir.rglob("*")):
         if f.is_file() and ".hyperframes" not in f.parts and "renders" not in f.parts:
             h.update(f.name.encode()); h.update(f.read_bytes())
-    h.update(json.dumps([variables, duration, width, height, fps, alpha, draft, logo, font],
+    h.update(json.dumps([variables, duration, width, height, fps, alpha, draft, logo, font, lang],
                         sort_keys=True, ensure_ascii=False).encode())
     for asset in (logo, font):  # the file's content, not just its name
         if asset and Path(asset).exists():
@@ -102,6 +119,12 @@ def render_motion(proj: Path, spec: dict, out: Path, width: int, height: int, fp
     html = html_path.read_text(encoding="utf-8")
     html = re.sub(r'data-duration="[\d.]+"(\s+data-vf-dur)', f'data-duration="{duration:g}"\\1', html)
     html = _resize(html, width, height)
+    # the language sets reading direction (titles align to it, lower thirds sit on its side) and fonts
+    html = re.sub(r'<html lang="[^"]*" dir="[^"]*"', f'<html lang="{lang}" dir="{"rtl" if rtl else "ltr"}"', html, count=1)
+    faces = LANG_FONTS.get(lang.split("-")[0])
+    if faces:
+        src = ", ".join(f'local("{f}")' for f in faces)
+        html = html.replace("</head>", f'<style>@font-face {{ font-family: "VF Sans"; src: {src}; }}</style>\n</head>')
     if logo and Path(logo).exists():
         (build / "assets").mkdir(exist_ok=True)
         shutil.copy(logo, build / "assets" / ("logo" + Path(logo).suffix.lower()))
@@ -110,7 +133,7 @@ def render_motion(proj: Path, spec: dict, out: Path, width: int, height: int, fp
         (build / "assets" / "fonts").mkdir(parents=True, exist_ok=True)
         dst = build / "assets" / "fonts" / ("brand" + Path(font).suffix.lower())
         shutil.copy(font, dst)
-        html = html.replace("</head>", f'<style>@font-face {{ font-family: "VF Hebrew"; '
+        html = html.replace("</head>", f'<style>@font-face {{ font-family: "VF Sans"; '
                                        f'src: url("assets/fonts/{dst.name}"); }}</style>\n</head>')
     html_path.write_text(html, encoding="utf-8")
     (build / "vars.json").write_text(json.dumps(variables, ensure_ascii=False), encoding="utf-8")

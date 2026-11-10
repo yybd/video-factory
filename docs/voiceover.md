@@ -29,10 +29,10 @@ words.
 | `--provider` | Key(s) | `--voice` | Notes |
 |---|---|---|---|
 | `elevenlabs` | `ELEVENLABS_API_KEY` | a voice id from your library | model `eleven_v3` by default (multilingual, Hebrew included); `--model` to change |
-| `azure` | `AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION` | `he-IL-HilaNeural` (default), `he-IL-AvriNeural` | neural Hebrew voices |
-| `google` | `GOOGLE_TTS_API_KEY` | `he-IL-Wavenet-A` (default), other `he-IL-*` | |
-| `openai` | `OPENAI_API_KEY` | `alloy` (default), `nova`, … | model `gpt-4o-mini-tts`; Hebrew via an instruction |
-| `say` | — | `Carmit` (default) | macOS only, free; a scratch voice to time the edit |
+| `azure` | `AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION` | any voice of the language, e.g. `en-US-JennyNeural`; `he-IL-HilaNeural` is the default for Hebrew | neural voices, the locale is taken from the voice |
+| `google` | `GOOGLE_TTS_API_KEY` | any voice of the language, e.g. `en-US-Neural2-F`; `he-IL-Wavenet-A` is the default for Hebrew | |
+| `openai` | `OPENAI_API_KEY` | `alloy` (default), `nova`, … | model `gpt-4o-mini-tts`; the language via an instruction |
+| `say` | — | a voice for the project's language (`Samantha`, `Carmit`, `Mónica`…) | macOS only, free; a scratch voice to time the edit |
 
 The API providers were written against each provider's documented endpoint and have not been
 run against a live key here. The first real run is the test. Compare voices on one beat

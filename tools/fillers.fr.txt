@@ -1,0 +1,11 @@
+# French hesitation sounds.
+euh
+Euh
+heu
+Heu
+bah
+Bah
+hum
+Hum
+mmm
+Mmm

@@ -18,5 +18,5 @@
     <rect x="130" y="318" width="60" height="28" rx="14" fill="#FFFFFF" fill-opacity="0.85"/>
   </g>
   <text x="320" y="166" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="112" font-weight="800" letter-spacing="-3" fill="#F4F4F0">video<tspan fill="#FFD200" dx="2">-</tspan>factory</text>
-  <text x="324" y="232" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="38" font-weight="500" fill="#A7B0BA">Hebrew-first video production for Claude Code</text>
+  <text x="324" y="232" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="38" font-weight="500" fill="#A7B0BA">Video production for Claude Code, in any language</text>
 </svg>

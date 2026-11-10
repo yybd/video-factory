@@ -1,0 +1,13 @@
+# German hesitation sounds.
+äh
+Äh
+ähm
+Ähm
+öh
+Öh
+hm
+Hm
+hmm
+Hmm
+mhm
+Mhm

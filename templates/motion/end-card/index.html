@@ -4,9 +4,9 @@
   vf.py copies the brand logo to assets/logo.png and puts an <img id="logo"> where VF_LOGO is.
   vf.py sets the length by rewriting every data-duration marked data-vf-dur.
 -->
-<html lang="he" dir="rtl"
+<html lang="en" dir="ltr"
   data-composition-variables='[
-    {"id":"cta","type":"string","label":"Call to action","default":"דברו איתנו היום"},
+    {"id":"cta","type":"string","label":"Call to action","default":"Talk to us today"},
     {"id":"line1","type":"string","label":"Line 1 (website)","default":""},
     {"id":"line2","type":"string","label":"Line 2 (phone)","default":""},
     {"id":"line3","type":"string","label":"Line 3","default":""},
@@ -20,10 +20,10 @@
     <meta name="viewport" content="width=1920, height=1080" />
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
     <style>
-      @font-face { font-family: "VF Hebrew"; src: local("Heebo"), local("Assistant"), local("Arial Hebrew"), local("Noto Sans Hebrew"), local("Arial"); }
+      @font-face { font-family: "VF Sans"; src: local("Inter"), local("Helvetica Neue"), local("Heebo"), local("Arial Hebrew"), local("Noto Sans"), local("Arial"); }
       * { margin: 0; padding: 0; box-sizing: border-box; }
       html, body { width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
-      #root { position: relative; width: 100%; height: 100%; font-family: "VF Hebrew", sans-serif; }
+      #root { position: relative; width: 100%; height: 100%; font-family: "VF Sans", sans-serif; }
       #bg { position: absolute; inset: 0; background: var(--panel); }
       #glow { position: absolute; width: 1400px; height: 1400px; border-radius: 50%; left: 260px; top: -160px;
               background: radial-gradient(circle, color-mix(in srgb, var(--accent) 22%, transparent) 0%, transparent 60%); }
@@ -43,7 +43,7 @@
         <div id="glow"></div>
         <div id="stack">
           <!--VF_LOGO-->
-          <div id="cta" data-var-text="cta">דברו איתנו היום</div>
+          <div id="cta" data-var-text="cta">Talk to us today</div>
           <div id="rule"></div>
           <div id="l1" class="line" data-var-text="line1"></div>
           <div id="l2" class="line" data-var-text="line2"></div>

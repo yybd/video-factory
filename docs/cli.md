@@ -14,22 +14,23 @@ Checks ffmpeg-full and its filters (subtitles, ass, drawtext, xfade, tile), ffmp
 whisper-cli and the model, and Node.js for motion graphics. Exit code 1 if something
 required is missing.
 
-## new `<name> [video|folder]… [--copy]`
+## new `<name> [video|folder]… [--copy] [--language L]`
 Creates `projects/<name>/` (source, transcript, visual, parts, renders) and **links** the sources.
 A folder adds its top-level video files (`.mp4 .mov .m4v .mkv .webm .avi .mts`). Re-running is
 safe, and adding a file to an existing project works. `--copy` copies instead (external drive,
 cloud folder, originals about to move). Cloud placeholders that are not downloaded are refused.
 Inputs are checked before anything is created. With no video, it makes an empty project (a
-script-led or graphics-only video); add footage later the same way.
+script-led or graphics-only video); add footage later the same way. `--language en|he|es…` stores the
+project's language in `project.json`; without it, the first transcription detects it.
 
 ## transcribe `<project>` [options]
 One transcript per source, `transcript/<src>.json` (segments with words, in seconds) plus `.srt`.
 
 | Flag | Default | |
 |---|---|---|
-| `--language` | `he` | spoken language |
+| `--language` | the project's; else detect | spoken language; detection needs the multilingual model |
 | `--prompt` | — | names and terms, as a short sentence |
-| `--model` | `VF_WHISPER_MODEL` / ivrit.ai | a ggml model file |
+| `--model` | ivrit.ai for Hebrew, multilingual otherwise | a ggml model file |
 | `--force` | off | redo existing transcripts |
 
 ## transcript `<project> [--words]`
@@ -92,7 +93,7 @@ Narration from `script.md`; see [Voice-over](voiceover.md).
 | `--voice` | provider default | voice id / name |
 | `--model` | provider default | e.g. `eleven_v3`, `gpt-4o-mini-tts` |
 | `--script` | `script.md` | |
-| `--language` | `he` | |
+| `--language` | the project's | |
 | `--speed` | `1.0` | |
 | `--gap` | `0.6` | seconds of silence between beats |
 | `--only` | — | re-voice only these beats, e.g. `2,5` |
@@ -101,12 +102,12 @@ Narration from `script.md`; see [Voice-over](voiceover.md).
 Tempo, beat count and the start of every bar, so parts can be cut on the music. The full grid is
 written to `renders/<music>.beats.json`.
 
-## review `<project> [--version V] [--draft] [--lang he|en]`
+## review `<project> [--version V] [--draft] [--lang en|he]`
 Writes `renders/<render>_review.html` next to the video: one static page, no server. It has the video, a
 **visual timeline** (parts and transitions, overlays, b-roll, captions, audio, with a playhead), and
 timecoded notes. On the timeline, parts can be dragged into a new order and any transition changed.
-Everything leaves as one text request for the editor. `--lang` sets the starting language; the page
-has an English / Hebrew toggle. See [Delivery](delivery.md).
+Everything leaves as one text request for the editor. `--lang` sets the starting language (default:
+Hebrew for a Hebrew project, else English); the page has an English / Hebrew toggle. See [Delivery](delivery.md).
 
 ## candidates `<project> [--min 15] [--max 60] [--top 12]`
 Finds moments that could stand alone as a short. It looks at windows of whole transcript segments and

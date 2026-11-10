@@ -4,10 +4,10 @@
   default (an intro or chapter card); "opaque": false makes it a transparent overlay.
   vf.py sets the length by rewriting every data-duration marked data-vf-dur.
 -->
-<html lang="he" dir="rtl"
+<html lang="en" dir="ltr"
   data-composition-variables='[
-    {"id":"title","type":"string","label":"Title","default":"כותרת ראשית"},
-    {"id":"subtitle","type":"string","label":"Subtitle","default":"שורת משנה קצרה"},
+    {"id":"title","type":"string","label":"Title","default":"Headline"},
+    {"id":"subtitle","type":"string","label":"Subtitle","default":"A short subtitle"},
     {"id":"kicker","type":"string","label":"Kicker (small line above)","default":""},
     {"id":"accent","type":"color","label":"Accent","default":"#FFD200"},
     {"id":"ink","type":"color","label":"Text","default":"#FFFFFF"},
@@ -20,17 +20,17 @@
     <meta name="viewport" content="width=1920, height=1080" />
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
     <style>
-      @font-face { font-family: "VF Hebrew"; src: local("Heebo"), local("Assistant"), local("Arial Hebrew"), local("Noto Sans Hebrew"), local("Arial"); }
+      @font-face { font-family: "VF Sans"; src: local("Inter"), local("Helvetica Neue"), local("Heebo"), local("Arial Hebrew"), local("Noto Sans"), local("Arial"); }
       * { margin: 0; padding: 0; box-sizing: border-box; }
       html, body { width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
-      #root { position: relative; width: 100%; height: 100%; font-family: "VF Hebrew", sans-serif; }
+      #root { position: relative; width: 100%; height: 100%; font-family: "VF Sans", sans-serif; }
       #bg { position: absolute; inset: 0; background: radial-gradient(ellipse at 70% 30%,
               color-mix(in srgb, var(--panel) 80%, var(--accent)) 0%, var(--panel) 70%); }
       #root.clear #bg { display: none; }
-      #block { position: absolute; top: 50%; right: 200px; left: 200px; transform: translateY(-50%); text-align: right; }
+      #block { position: absolute; top: 50%; right: 200px; left: 200px; transform: translateY(-50%); text-align: start; }
       #kicker { color: var(--accent); font-size: 40px; font-weight: 700; letter-spacing: 0.04em; margin-bottom: 18px; }
       #title { color: var(--ink); font-size: 128px; font-weight: 800; line-height: 1.05; }
-      #rule { height: 10px; width: 260px; background: var(--accent); margin: 36px 0 30px auto; }
+      #rule { height: 10px; width: 260px; background: var(--accent); margin-block: 36px 30px; margin-inline-end: auto; }
       #subtitle { color: var(--ink); opacity: 0.85; font-size: 54px; font-weight: 400; line-height: 1.25; }
       #root.top #block { top: 12%; transform: none; }
       #root.bottom #block { top: auto; bottom: 14%; transform: none; }
@@ -44,9 +44,9 @@
         <div id="bg"></div>
         <div id="block">
           <div id="kicker" data-var-text="kicker"></div>
-          <div id="title" data-var-text="title">כותרת ראשית</div>
+          <div id="title" data-var-text="title">Headline</div>
           <div id="rule"></div>
-          <div id="subtitle" data-var-text="subtitle">שורת משנה קצרה</div>
+          <div id="subtitle" data-var-text="subtitle">A short subtitle</div>
         </div>
       </div>
     </div>
@@ -56,12 +56,13 @@
       if (v.opaque === false) root.classList.add("clear");
       if (v.place === "top" || v.place === "bottom") root.classList.add(v.place);
       const D = parseFloat(root.dataset.duration);
+      const origin = document.documentElement.dir === "rtl" ? "100% 50%" : "0% 50%";
       const tl = gsap.timeline({ paused: true });
       tl.fromTo("#kicker", { opacity: 0, y: -20 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.1)
         .fromTo("#title", { opacity: 0, y: 50 }, { opacity: 1, y: 0, duration: 0.7, ease: "power4.out" }, 0.2)
-        .fromTo("#rule", { scaleX: 0 }, { scaleX: 1, transformOrigin: "100% 50%", duration: 0.6, ease: "power3.inOut" }, 0.5)
+        .fromTo("#rule", { scaleX: 0 }, { scaleX: 1, transformOrigin: origin, duration: 0.6, ease: "power3.inOut" }, 0.5)
         .fromTo("#subtitle", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" }, 0.75)
-        .to("#title", { scale: 1.03, transformOrigin: "100% 50%", duration: Math.max(0.5, D - 1.4), ease: "none" }, 0.9)
+        .to("#title", { scale: 1.03, transformOrigin: origin, duration: Math.max(0.5, D - 1.4), ease: "none" }, 0.9)
         .to("#block", { opacity: 0, duration: 0.45, ease: "power2.in" }, D - 0.5);
       window.__timelines["main"] = tl;
       tl.seek(0);
