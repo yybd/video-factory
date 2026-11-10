@@ -12,7 +12,8 @@
     {"id":"accent","type":"color","label":"Accent","default":"#FFD200"},
     {"id":"ink","type":"color","label":"Text","default":"#FFFFFF"},
     {"id":"panel","type":"color","label":"Background","default":"#101418"},
-    {"id":"opaque","type":"boolean","label":"Solid background","default":true}
+    {"id":"opaque","type":"boolean","label":"Solid background","default":true},
+    {"id":"place","type":"enum","label":"Vertical place","default":"center","options":[{"value":"center","label":"Center"},{"value":"top","label":"Top third (hooks on shorts)"},{"value":"bottom","label":"Bottom third"}]}
   ]'>
   <head>
     <meta charset="UTF-8" />
@@ -31,6 +32,8 @@
       #title { color: var(--ink); font-size: 128px; font-weight: 800; line-height: 1.05; }
       #rule { height: 10px; width: 260px; background: var(--accent); margin: 36px 0 30px auto; }
       #subtitle { color: var(--ink); opacity: 0.85; font-size: 54px; font-weight: 400; line-height: 1.25; }
+      #root.top #block { top: 12%; transform: none; }
+      #root.bottom #block { top: auto; bottom: 14%; transform: none; }
       #root.clear #title, #root.clear #subtitle { text-shadow: 0 4px 24px rgba(0,0,0,0.6); }
     </style>
   </head>
@@ -51,6 +54,7 @@
       const v = (window.__hyperframes && window.__hyperframes.getVariables && window.__hyperframes.getVariables()) || {};
       const root = document.getElementById("root");
       if (v.opaque === false) root.classList.add("clear");
+      if (v.place === "top" || v.place === "bottom") root.classList.add(v.place);
       const D = parseFloat(root.dataset.duration);
       const tl = gsap.timeline({ paused: true });
       tl.fromTo("#kicker", { opacity: 0, y: -20 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.1)

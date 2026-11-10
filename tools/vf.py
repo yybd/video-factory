@@ -12,6 +12,8 @@ deterministic work around that decision:
   vf.py scenes <project>               visual scene changes per source
   vf.py status [project]               where each project stands, and the next step
   vf.py reference <project> <video>    study a video to imitate: pace, transitions, look, captions
+  vf.py candidates <project>           moments that could stand alone as shorts, ranked for Claude to judge
+  vf.py clips <project>                render clips.json as vertical shorts (captions, hook, brand)
   vf.py render <project> [--draft] [--version V]   story.json -> renders/final.mp4 (or draft / <version>)
   vf.py voice <project> --provider P   narration from script.md (ElevenLabs, Azure, Google, OpenAI, or macOS say)
   vf.py beats <project> <music>        tempo and beat grid, to cut on the music
@@ -495,6 +497,108 @@ def cmd_reference(a) -> None:
     print(f"  then write {out}/style.md and carry it into story.json")
 
 
+HOOK_WORDS_HE = {"סוד", "טעות", "טעויות", "הכי", "אף", "תמיד", "לעולם", "למה", "איך", "מה", "שימו", "חשוב",
+                 "בעצם", "האמת", "מפתיע", "פשוט", "צריך", "אסור", "חייבים", "כולם", "אף אחד", "רגע", "דמיינו",
+                 "מכירים", "טריק", "שיטה", "סיבה", "הבעיה", "הפתרון", "בלי"}
+
+
+def cmd_candidates(a) -> None:
+    """Moments that could stand alone as a short: windows of whole transcript segments, scored on
+    signals a clip needs (a hook up front, numbers, energy, a complete ending). A shortlist for
+    Claude to read and judge — the score is a proxy, the decision is not made here."""
+    proj = project_dir(a.project)
+    fillers = load_fillers(a.language)
+    rows = []
+    for src in sources(proj):
+        segs = load_transcript(proj, src)
+        for i in range(len(segs)):
+            for j in range(i, len(segs)):
+                st, en = segs[i]["start"], segs[j]["end"]
+                if en - st > a.max:
+                    break
+                if en - st < a.min:
+                    continue
+                text = " ".join(s["text"] for s in segs[i:j + 1])
+                words = [w for s in segs[i:j + 1] for w in s["words"]] or text.split()
+                first = segs[i]["text"]
+                first_words = {norm_word(w) for w in first.split()}
+                hook = (2 if "?" in first else 0) + (2 if re.search(r"\d", first) else 0) \
+                    + 1.5 * len(first_words & HOOK_WORDS_HE) + (1 if len(first.split()) <= 8 else 0)
+                numbers = len(re.findall(r"\d+%?", text))
+                rate = len(words) / max(1.0, en - st)
+                filler_share = sum(1 for w in words if norm_word(w["word"] if isinstance(w, dict) else w) in fillers) / max(1, len(words))
+                ends = 1 if segs[j]["text"].rstrip().endswith((".", "!", "?")) else 0
+                gap_before = segs[i]["start"] - (segs[i - 1]["end"] if i else 0) >= 0.4
+                score = round(hook * 1.5 + min(numbers, 3) + min(rate, 4) + 2 * ends + (1 if gap_before else 0)
+                              - 10 * filler_share, 2)
+                rows.append({"source": src, "start": round(max(0, st - 0.15), 2), "end": round(en + 0.2, 2),
+                             "length": round(en - st, 1), "score": score, "first": first, "text": text,
+                             "segments": [i, j]})
+    rows.sort(key=lambda r: -r["score"])
+    picked = []
+    for r in rows:  # no two candidates from the same stretch
+        if all(r["source"] != q["source"] or r["end"] <= q["start"] or r["start"] >= q["end"] for q in picked):
+            picked.append(r)
+        if len(picked) >= a.top:
+            break
+    (proj / "candidates.json").write_text(json.dumps({"candidates": picked}, ensure_ascii=False, indent=1), encoding="utf-8")
+    if not picked:
+        print(f"  no window of {a.min:g}–{a.max:g}s in the transcripts — transcribe first, or change --min/--max")
+        return
+    for k, r in enumerate(picked, 1):
+        print(f"  #{k} [{r['source']} {fmt(r['start'])}-{fmt(r['end'])} {r['length']}s] score {r['score']}")
+        print(f"     hook: {r['first'][:110]}")
+    print(f"  -> {proj / 'candidates.json'} (full text of each). Read them, pick, and write clips.json.")
+
+
+def cmd_clips(a) -> None:
+    """Render clips.json: each clip a self-contained short (vertical by default) with word-by-word
+    captions, a hook title over the first seconds, the brand, and optionally an end card."""
+    import argparse as _ap
+    proj = project_dir(a.project)
+    cfg = read_json(proj / "clips.json", "clips.json (pick moments first: vf.py candidates)")
+    style = {"width": 1080, "height": 1920, "fit": "crop", "clean": ["fillers", "pauses"], "max_pause": 0.4,
+             "karaoke_style": "word", "caption_size": 24, "caption_position": "bottom", "hook_seconds": 2.5,
+             "logo": True, **cfg.get("style", {})}
+    only = set(a.only.split(",")) if a.only else None
+    clips = [c for c in cfg.get("clips", []) if not only or c["id"] in only]
+    if not clips:
+        sys.exit("clips.json has no clips" + (f" matching {a.only}" if only else ""))
+    brand_logo = (proj / "brand.json").exists() and json.loads((proj / "brand.json").read_text(encoding="utf-8")).get("logo")
+    results = []
+    for c in clips:
+        part = {"id": c["id"], "source": c["source"], "start": c["start"], "end": c["end"],
+                "clean": c.get("clean", style["clean"]), "max_pause": style["max_pause"]}
+        parts = [part]
+        if style.get("end_card"):
+            parts.append({"id": f"{c['id']}-end", "motion": {"template": "end-card", **style["end_card"]}})
+        story = {"title": c.get("title", c["id"]),
+                 "output": {"width": style["width"], "height": style["height"], "fps": style.get("fps", 30)},
+                 "fit": style["fit"], "transition": {"type": "fade", "duration": 0.3}, "parts": parts,
+                 "captions": {"enabled": True, "language": style.get("language", "he"), "karaoke": True,
+                              "karaoke_style": style["karaoke_style"], "size": style["caption_size"],
+                              "position": style["caption_position"], "cues": cfg.get("cues", [])},
+                 "overlays": [], "loudness": style.get("loudness", -14)}
+        hook = c.get("hook") or c.get("title")
+        if hook:
+            story["overlays"].append({"part": c["id"], "at": 0, "motion": {"template": "title", "duration": style["hook_seconds"],
+                                      "vars": {"title": hook, "subtitle": c.get("subtitle", ""), "opaque": False,
+                                                       "place": style.get("hook_place", "top")}}})
+        if style.get("logo") and brand_logo:
+            story["overlays"].append({"logo": True, "whole": True, "position": "top-left", "scale": 160, "opacity": 0.85})
+        if style.get("music"):
+            story["music"] = style["music"]
+        validate_story(proj, story, sources(proj))
+        print(f"== clip {c['id']}: {c.get('title') or c.get('hook', '')}")
+        ns = _ap.Namespace(draft=a.draft, force=False, keep_stages=False, keep_going=True)
+        problems = render_story(proj, story, f"clip_{c['id']}" + ("_draft" if a.draft else ""), ns)
+        results.append((c["id"], problems))
+    bad = [(i, p) for i, p in results if p]
+    print(f"  {len(results) - len(bad)}/{len(results)} clips passed QA" + (": " + "; ".join(f"{i}: {', '.join(p)}" for i, p in bad) if bad else ""))
+    if bad:
+        sys.exit(2)
+
+
 def cmd_status(a) -> None:
     """Where each project stands, and the next step."""
     import datetime
@@ -721,8 +825,13 @@ def validate_story(proj: Path, story: dict, srcs: dict[str, Path]) -> None:
     dupes = sorted({i for i in ids if ids.count(i) > 1 and i})
     if dupes:
         errs.append(f"duplicate part id(s): {dupes}")
-    tr = story.get("transition", {"type": "fade", "duration": 0.5})
-    tdur = 0.0 if tr.get("type") == "none" else float(tr.get("duration", 0.5))
+    junc = junctions(story)
+    known_types = xfade_types()
+    for k, (typ, _) in enumerate(junc):
+        if typ not in known_types:
+            where = f"part {parts[k].get('id')}" if parts[k].get("transition") else "transition"
+            errs.append(f"{where}: unknown transition {typ!r} (some: fade, dissolve, fadeblack, wipeleft, "
+                        "slideleft, circleopen, zoomin, pixelize, hblur — docs/story-json.md lists all)")
     no_transcript = set()
     for i, p in enumerate(parts):
         pid = p.get("id") or f"#{i + 1}"
@@ -745,10 +854,12 @@ def validate_story(proj: Path, story: dict, srcs: dict[str, Path]) -> None:
             if not (proj / "transcript" / f"{p['source']}.json").exists():
                 no_transcript.add(p["source"])
         # a clip shorter than its transitions cannot be crossfaded: interior parts take two
-        need = tdur * (2 if 0 < i < len(parts) - 1 else 1) + 0.1 if len(parts) > 1 and tdur else 0
+        d_in = junc[i][1] if i > 0 else 0.0
+        d_out = junc[i + 1][1] if i + 1 < len(parts) else 0.0
+        need = d_in + d_out + 0.1 if (d_in or d_out) else 0
         if need and length < need:
-            errs.append(f"part {pid}: {length:.2f}s is too short for {tdur:g}s transitions "
-                        f"(needs more than {need:.2f}s) — lengthen it or shorten transition.duration")
+            errs.append(f"part {pid}: {length:.2f}s is too short for its transitions ({d_in:g}s in, {d_out:g}s out; "
+                        f"needs more than {need:.2f}s) — lengthen it or shorten the transitions")
     known = set(ids)
     for kind in ("overlays", "broll"):
         for o in story.get(kind, []):
@@ -880,11 +991,86 @@ def stage(stages: Path, name: str) -> Path:
     return stages / f"{name}.mp4"
 
 
+def xfade_types() -> set[str]:
+    """The transitions this ffmpeg's xfade filter knows (about 60 in FFmpeg 7+)."""
+    out = subprocess.run([ffbin("ffmpeg"), "-hide_banner", "-h", "filter=xfade"], capture_output=True, text=True).stdout
+    block = out.split("transition", 1)[1].split("duration", 1)[0] if "transition" in out else ""
+    names = set(re.findall(r"^\s+([a-z]+)\s+-?\d+", block, flags=re.M)) - {"custom"}
+    return names | {"none"}
+
+
+def junctions(story: dict) -> list[tuple[str, float]]:
+    """The transition INTO each part (index 0 is unused): the part's own "transition", else the story's."""
+    g = story.get("transition", {"type": "fade", "duration": 0.5})
+    out = []
+    for p in story.get("parts", []):
+        t = {**g, **p.get("transition", {})} if isinstance(p.get("transition"), dict) else g
+        typ = t.get("type", "fade")
+        out.append((typ, 0.0 if typ == "none" else float(t.get("duration", 0.5))))
+    return out
+
+
+def fps_float(fps: str) -> float:
+    if "/" in fps:
+        n, d = fps.split("/")
+        return float(n) / float(d)
+    return float(fps)
+
+
+def join_mixed(part_files: list[Path], lengths: list[float], junc: list[tuple[str, float]], W: int, H: int,
+               FPS: str, fit: str, out: Path, draft: bool) -> None:
+    """Join parts with a different transition at each junction (ffmpeg-skill's join takes one).
+    Every part is normalised (size, fit, fps, pixel format, 48 kHz stereo), then chained with
+    xfade + acrossfade. A "none" junction is a one-frame fade — a cut, visually."""
+    one_frame = 1.0 / fps_float(FPS)
+    cmd = [ffbin("ffmpeg"), "-v", "error", "-y"]
+    for f in part_files:
+        cmd += ["-i", str(f)]
+    chains, n_in = [], len(part_files)
+    for i, (f, L) in enumerate(zip(part_files, lengths)):
+        has_audio = bool(subprocess.run([ffbin("ffprobe"), "-v", "error", "-select_streams", "a", "-show_entries",
+                                         "stream=index", "-of", "csv=p=0", str(f)], capture_output=True, text=True).stdout.strip())
+        if fit == "crop":
+            geo = f"scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H}"
+        else:
+            geo = f"scale={W}:{H}:force_original_aspect_ratio=decrease,pad={W}:{H}:(ow-iw)/2:(oh-ih)/2:color=black"
+        chains.append(f"[{i}:v]{geo},setsar=1,fps={FPS},format=yuv420p,setpts=PTS-STARTPTS,"
+                      f"trim=duration={L:.3f},settb=AVTB[v{i}]")
+        if has_audio:
+            chains.append(f"[{i}:a:0]aresample=48000,aformat=sample_rates=48000:channel_layouts=stereo,"
+                          f"asetpts=PTS-STARTPTS,apad,atrim=duration={L:.3f}[a{i}]")
+        else:
+            cmd += ["-f", "lavfi", "-t", f"{L:.3f}", "-i", "anullsrc=r=48000:cl=stereo"]
+            chains.append(f"[{n_in}:a]atrim=duration={L:.3f}[a{i}]")
+            n_in += 1
+    vlast, alast, cum = "[v0]", "[a0]", lengths[0]
+    for i in range(1, len(part_files)):
+        typ, d = junc[i]
+        if typ == "none" or d <= 0:
+            typ, d = "fade", max(d, one_frame)
+        off = cum - d
+        chains.append(f"{vlast}[v{i}]xfade=transition={typ}:duration={d:.3f}:offset={off:.3f}[vx{i}]")
+        chains.append(f"{alast}[a{i}]acrossfade=d={d:.3f}:c1=tri:c2=tri[ax{i}]")
+        vlast, alast, cum = f"[vx{i}]", f"[ax{i}]", cum + lengths[i] - d
+    cmd += ["-filter_complex", ";".join(chains), "-map", vlast, "-map", alast, "-c:v", "libx264",
+            "-preset", "veryfast" if draft else "medium", "-crf", "18", "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(out)]
+    r = run(cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        sys.exit("joining with mixed transitions failed: " + (r.stderr.strip().splitlines() or ["?"])[-1])
+
+
 def cmd_render(a) -> None:
-    import vf_motion
     proj = project_dir(a.project)
     story = load_story(proj, a.version)
     name = (f"{a.version}_draft" if a.draft else a.version) if a.version else ("draft" if a.draft else "final")
+    render_story(proj, story, name, a)
+
+
+def render_story(proj: Path, story: dict, name: str, a) -> list[str]:
+    """Render one story to renders/<name>.mp4. `a` carries draft / force / keep_stages.
+    Returns the QA problems (empty = ok); the caller decides whether that ends the run."""
+    import vf_motion
     srcs = sources(proj)
     validate_story(proj, story, srcs)
     for old in list(proj.glob("captions*.srt")) + list(proj.glob("captions*.words.json")):
@@ -895,6 +1081,11 @@ def cmd_render(a) -> None:
     ttype, tdur = tr.get("type", "fade"), float(tr.get("duration", 0.5))
     if ttype == "none":
         tdur = 0.0
+    junc = junctions(story)  # the transition into each part
+    mixed = len(set(junc[1:])) > 1 or (len(junc) > 1 and junc[1] != (ttype, tdur))
+    if mixed:  # a "none" junction is a one-frame fade there, and the timeline must count that frame
+        frame = 1.0 / fps_float(FPS)
+        junc = [junc[0]] + [("none", frame) if (t == "none" or d <= 0) else (t, d) for t, d in junc[1:]]
     stages = proj / "renders" / f".stages-{name}"
     stages.mkdir(parents=True, exist_ok=True)
     fast = ["--fast"] if a.draft else []
@@ -907,7 +1098,9 @@ def cmd_render(a) -> None:
         if it["ranges"] is None:
             continue
         kept = sum(r1 - r0 for r0, r1 in it["ranges"])
-        need = tdur * (2 if 0 < i < len(items) - 1 else 1) + 0.1 if len(items) > 1 and tdur else 0.1
+        d_in = junc[i][1] if i > 0 else 0.0
+        d_out = junc[i + 1][1] if i + 1 < len(items) else 0.0
+        need = d_in + d_out + 0.1
         if kept < need:
             short.append(f"part {it['part']['id']}: {kept:.2f}s left after snapping/cleaning"
                          + (f", needs more than {need:.2f}s for its transitions" if need > 0.1 else " — nothing to cut"))
@@ -938,12 +1131,17 @@ def cmd_render(a) -> None:
         plan.append({**it, "map": m, "start": offset, "length": length})
         part_files.append(f)
         print(f"  part {p['id']}: {note} ({length:.2f}s)  {p.get('title', '')}")
-        offset += length - (tdur if i < len(items) - 1 else 0.0)
+        offset += length - (junc[i + 1][1] if i + 1 < len(items) else 0.0)
+        if i > 0 and mixed:
+            note_t = junc[i]
+            print(f"      ↳ in: {note_t[0]}" + (f" {note_t[1]:g}s" if note_t[1] else ""))
     by_id = {it["part"]["id"]: it for it in plan}
 
     # 2. join with transitions, normalising size / fps / audio
     cur = stage(stages, "1-joined")
-    if len(part_files) == 1:
+    if mixed:
+        join_mixed(part_files, [it["length"] for it in plan], junc, W, H, FPS, story.get("fit", "pad"), cur, a.draft)
+    elif len(part_files) == 1:
         ff("fit", part_files[0], "--width", str(W), "--height", str(H), "--fit", story.get("fit", "pad"),
            "--fps", str(FPS), "-o", cur, "--overwrite", "--json-brief", *fast)
     else:
@@ -1140,10 +1338,64 @@ def cmd_render(a) -> None:
         shutil.rmtree(stages, ignore_errors=True)
     problems = qa_check(final, offset, W, H, story, cap)
     print(f"done: {final}  ({probe_duration(final):.2f}s, planned {offset:.2f}s, {W}x{H}@{FPS})")
+    write_timeline_data(proj, story, plan, junc, offset, name, final)
     if problems:
         print("QA: " + "; ".join(problems) + " — look before delivering", file=sys.stderr)
-        sys.exit(2)
-    print("QA: ok (length, size, video and audio streams, captions)")
+        if not getattr(a, "keep_going", False):
+            sys.exit(2)
+    else:
+        print("QA: ok (length, size, video and audio streams, captions)")
+    return problems
+
+
+def write_timeline_data(proj: Path, story: dict, plan: list[dict], junc: list, total: float, name: str,
+                        final: Path) -> None:
+    """renders/<name>.timeline.json — every track on the final timeline, for the review page."""
+    by_id = {it["part"]["id"]: it for it in plan}
+    parts = []
+    for i, it in enumerate(plan):
+        p = it["part"]
+        parts.append({"id": p["id"], "start": round(it["start"], 3), "length": round(it["length"], 3),
+                      "title": p.get("title", ""), "why": p.get("why", ""),
+                      "kind": "motion" if "motion" in p else "footage",
+                      "label": p["motion"]["template"] if "motion" in p else p["source"],
+                      "src": None if "motion" in p else [p["start"], p["end"]],
+                      "transition_in": None if i == 0 else {"type": junc[i][0], "duration": round(junc[i][1], 3)}})
+    def placed(items, label):
+        out = []
+        for o in items:
+            t = 0.0 if o.get("whole") else final_time(o, by_id)
+            if t is None:
+                continue
+            d = total - t if o.get("whole") else float(o.get("duration") or (o.get("motion") or {}).get("duration") or 4)
+            out.append({"start": round(t, 3), "length": round(d, 3), "label": label(o)})
+        return out
+    overlays = placed(story.get("overlays", []), lambda o: (o.get("motion") or {}).get("template")
+                      or ("logo" if o.get("logo") else Path(o.get("image", "image")).name))
+    broll = placed(story.get("broll", []), lambda o: o.get("source") or (o.get("motion") or {}).get("template", "motion"))
+    cues = []
+    srt = proj / "captions.srt"
+    if srt.exists():
+        for block in srt.read_text(encoding="utf-8").strip().split("\n\n"):
+            lines = block.splitlines()
+            m = re.match(r"(\d+):(\d+):(\d+),(\d+) --> (\d+):(\d+):(\d+),(\d+)", lines[1]) if len(lines) > 2 else None
+            if m:
+                g = [int(x) for x in m.groups()]
+                st = g[0] * 3600 + g[1] * 60 + g[2] + g[3] / 1000
+                en = g[4] * 3600 + g[5] * 60 + g[6] + g[7] / 1000
+                cues.append({"start": round(st, 3), "length": round(en - st, 3), "label": " ".join(lines[2:])})
+    audio = []
+    vo = story.get("voiceover")
+    if vo and (proj / vo.get("file", "voice/voiceover.wav")).exists():
+        at = float(vo.get("at", 0))
+        audio.append({"start": at, "length": round(min(total - at, probe_duration(proj / vo.get("file", "voice/voiceover.wav"))), 3),
+                      "label": "voice-over"})
+    if story.get("music"):
+        audio.append({"start": 0.0, "length": round(total, 3), "label": "music: " + Path(story["music"]["file"]).name})
+    data = {"name": name, "video": final.name, "title": story.get("title", proj.name), "duration": round(total, 3),
+            "tracks": {"parts": parts, "overlays": overlays, "broll": broll, "captions": cues, "audio": audio},
+            "transition_types": sorted(xfade_types())}
+    (final.parent / f"{name}.timeline.json").write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
 
 
 def qa_check(final: Path, planned: float, W: int, H: int, story: dict, cap: dict) -> list[str]:
@@ -1251,12 +1503,12 @@ def cmd_beats(a) -> None:
 def cmd_review(a) -> None:
     import vf_review
     proj = project_dir(a.project)
-    name = a.version or "final"
+    name = (f"{a.version}_draft" if a.draft else a.version) if a.version else ("draft" if a.draft else "final")
     video = proj / "renders" / f"{name}.mp4"
     if not video.exists():
         sys.exit(f"{video} not found — render it first")
     story = read_json(proj / "story.json", "story.json") if (proj / "story.json").exists() else {}
-    page = vf_review.write_review(proj, video, story.get("title", proj.name))
+    page = vf_review.write_review(proj, video, story.get("title", proj.name), a.lang)
     print(f"  {page}\n  send the client the renders/ folder (or both files); notes come back as text")
 
 
@@ -1285,7 +1537,7 @@ def cmd_export(a) -> None:
               "as a straight cut so it does not land inside a sentence", file=sys.stderr)
         tr = {"type": "none", "duration": 0}
     dest = proj / "renders" / f"{a.version or 'edit'}.{a.format}"
-    vf_review.export_timeline(proj, story, clips, tr, dest, W, H, FPS, SKILL_SCRIPTS, run)
+    vf_review.export_timeline(proj, story, clips, tr, dest, W, H, round(fps_float(FPS), 3), SKILL_SCRIPTS, run)
     print(f"  {dest}  ({len(clips)} clips) — open in Resolve / Premiere / Final Cut; captions: captions.srt")
 
 
@@ -1325,6 +1577,15 @@ def main() -> None:
     p.add_argument("--every", type=float, default=0, help="seconds between tiles (default ~48 tiles)")
     p.add_argument("--threshold", type=float, default=0.3); p.set_defaults(fn=cmd_reference)
 
+    p = sub.add_parser("candidates", help="moments that could stand alone as shorts, ranked for Claude to judge")
+    p.add_argument("project"); p.add_argument("--min", type=float, default=15); p.add_argument("--max", type=float, default=60)
+    p.add_argument("--top", type=int, default=12); p.add_argument("--language", default="he")
+    p.set_defaults(fn=cmd_candidates)
+
+    p = sub.add_parser("clips", help="render clips.json as vertical shorts")
+    p.add_argument("project"); p.add_argument("--only", default="", help="clip ids, e.g. c1,c3")
+    p.add_argument("--draft", action="store_true"); p.set_defaults(fn=cmd_clips)
+
     p = sub.add_parser("status", help="where each project stands, and the next step")
     p.add_argument("project", nargs="?", default=""); p.set_defaults(fn=cmd_status)
 
@@ -1351,8 +1612,11 @@ def main() -> None:
     p = sub.add_parser("beats", help="tempo and beat grid of a music file")
     p.add_argument("project"); p.add_argument("music"); p.set_defaults(fn=cmd_beats)
 
-    p = sub.add_parser("review", help="a page for the client to leave timecoded notes")
-    p.add_argument("project"); p.add_argument("--version", default=""); p.set_defaults(fn=cmd_review)
+    p = sub.add_parser("review", help="video + visual timeline + notes, one static page next to the render")
+    p.add_argument("project"); p.add_argument("--version", default="")
+    p.add_argument("--draft", action="store_true", help="the draft render (or <version>_draft)")
+    p.add_argument("--lang", default="he", choices=["he", "en"], help="the page's starting language (it has a toggle)")
+    p.set_defaults(fn=cmd_review)
 
     p = sub.add_parser("export", help="the edit as an editor timeline (Resolve / Premiere / Final Cut)")
     p.add_argument("project"); p.add_argument("--format", default="fcpxml", choices=["fcpxml", "edl", "otio"])

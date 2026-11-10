@@ -114,11 +114,16 @@ Exit code 2 = something is off. Never report such a render as done; fix the caus
 Correct wording in `captions.cues` (`{"id": "<source>:<segment #>", "text": ...}`; the `#N` from
 `vf.py transcript`, or `voiceover:N`). Fix spelling, never content.
 
-### 7. Client review (when there is a client)
-`python3 tools/vf.py review <name> [--version V]` writes `renders/<name>_review.html` next to the
-video. The client watches it and leaves notes at moments. "Copy" or "save" gives text like
-`0:12.4 — לקצר את הפתיח`. When the notes come back, map each time to a part (the render
-prints part lengths), apply the change in story.json, and re-render.
+### 7. Review page (yours, or the client's)
+`python3 tools/vf.py review <name> [--draft] [--version V] [--lang en]` writes
+`renders/<render>_review.html` next to the video. It is one static page with no server, holding the
+video, a visual timeline of every track, and notes; it has a Hebrew/English toggle. Offer it after
+every draft. The text that comes back has lines like:
+`order: intro, chart, hello, …`, which reorders `parts` to that list;
+`transition into chart: circleopen 0.7s`, which sets that part's `"transition"`;
+`0:12.4 — לקצר את הפתיח`, which needs the part at that time found in
+`renders/<render>.timeline.json` (each part's start and length) and the change made. Apply them all,
+re-render, and summarise what changed.
 
 ### 8. Final and delivery
 `python3 tools/vf.py render <name>` writes `renders/final.mp4`. Versions (vertical, 30 s, 15 s) come
@@ -193,6 +198,11 @@ Report in ffmpeg-skill's format: `Done:` / `Steps:` / `Check:` / `Look:` / `Note
 
 ## Delivery extras
 
+- **Transitions per junction**: a part's `"transition": {"type", "duration"}` is the transition INTO
+  it, overriding the story's. Use the change of transition to mark structure: `none` or a short `fade`
+  inside a topic, `fadeblack` 0.6–1 s at a new chapter, `zoomin` / `slideleft` / `circleopen` into a
+  graphic, `dissolve` for time passing. Don't use more than 3–4 kinds in one video. About 60 xfade
+  types are valid; validation lists unknown ones.
 - **Versions**: `"versions": {"reels": {"parts": [ids…], "output": {"width": 1080, "height":
   1920}, "fit": "crop"}, "30s": {"parts": [...]}}`. Anything else in a version overrides the story
   for it (captions, music…). Overlays and b-roll tied to a part that is not in the version are
@@ -203,6 +213,25 @@ Report in ffmpeg-skill's format: `Done:` / `Steps:` / `Check:` / `Look:` / `Note
   `"captions": {"translations": {"en": {"mode": "mux"}}}`, where `mux` is a toggleable track and
   `burn` is burned at the top. The render reports untranslated cues.
 
+## Shorts from a long video
+
+1. `python3 tools/vf.py candidates <name> [--min 15 --max 60 --top 12]` ranks windows of whole
+   transcript segments and writes `candidates.json` with their full text. The score is a pointer only.
+2. Read every candidate in full and choose like a social editor. A clip:
+   - makes sense with **no context** (no "as I said", no dangling "that");
+   - **opens on its strongest line**, so trim to start at the hook even mid-segment (word times are in
+     the transcript);
+   - holds one idea and **ends on a payoff** (an answer, a number, a punchline, a call to action);
+   - runs 15–60 s, shorter being better.
+   Prefer surprise, a concrete number, a strong opinion, a story with a turn, practical advice.
+   Skip greetings, logistics and inside references. Give each a hook title of 2–6 words that
+   promises the payoff without giving it away, in the spoken language. Show the user the picks
+   with their reasons before rendering.
+3. Write `clips.json` (`style` + `clips: [{id, source, start, end, hook, why}]` + `cues` for spelling
+   fixes) and run `python3 tools/vf.py clips <name> [--draft] [--only c2]`. Each clip is vertical,
+   cleaned, word-by-word captioned, with the hook in the top third, the logo, −14 LUFS, and an end
+   card if `style.end_card` is set. Look at each clip's `renders/clip_<id>_sheet.png`.
+
 ## Cutting at exact seconds
 
 User-given times ("from 1:20 to 1:45", "משנייה 12 עד 30") are used as given with `"exact": true`
@@ -212,9 +241,8 @@ no story: `python3 tools/vf.py ff cut <source> --start 1:20 --end 1:45 --accurat
 ## Footage-part options (story.json)
 
 `clean: ["fillers", "pauses"]` + `max_pause` (talking heads only; fillers listed in
-`tools/fillers.he.txt`, never discourse words), `exact`, `captions: false`. Transitions are
-`transition.type` (`fade`, `fadeblack`, `dissolve`, `wipeleft`, `slideleft`, `circleopen`, `none`, …)
-and `duration`, one for the whole video. Captions: `karaoke`, `karaoke_style` (`sweep` | `word`),
+`tools/fillers.he.txt`, never discourse words), `exact`, `captions: false`, and `transition` (the
+transition into the part). The story's `transition` is the default at every junction. Captions: `karaoke`, `karaoke_style` (`sweep` | `word`),
 `font`, `size`, `position`, `animate`. Full schema: `docs/story-json.md`.
 
 ## Beyond the pipeline
