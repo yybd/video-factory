@@ -4,12 +4,14 @@
 The skill (Claude) decides *what* to cut and in what order; this script does the
 deterministic work around that decision:
 
-  vf.py doctor                         check ffmpeg-full, ffmpeg-skill, transcription engines
+  vf.py doctor                         check ffmpeg-full, ffmpeg-skill, whisper.cpp + model, Node
   vf.py new <name> <video|folder>...   create projects/<name>/ with the sources linked in (--copy to copy)
   vf.py transcribe <project>           transcript with WORD timings per source -> transcript/<src>.json
   vf.py transcript <project> [--words] print transcripts (and visual notes) as "[src mm:ss.ss-mm:ss.ss] text"
   vf.py frames <project> [--every N]   contact sheets with timecodes + scene list, for footage without speech
   vf.py scenes <project>               visual scene changes per source
+  vf.py status [project]               where each project stands, and the next step
+  vf.py reference <project> <video>    study a video to imitate: pace, transitions, look, captions
   vf.py render <project> [--draft] [--version V]   story.json -> renders/final.mp4 (or draft / <version>)
   vf.py voice <project> --provider P   narration from script.md (ElevenLabs, Azure, Google, OpenAI, or macOS say)
   vf.py beats <project> <music>        tempo and beat grid, to cut on the music
@@ -17,12 +19,13 @@ deterministic work around that decision:
   vf.py export <project> [--format F]  the edit as a Resolve / Premiere / Final Cut timeline
   vf.py ff <tool> [args...]            run an ffmpeg-skill script with ffmpeg-full on PATH
 
-Standard library only.
+Standard library only. Quiet by default; VF_VERBOSE=1 prints every underlying command.
 """
 from __future__ import annotations
 
 import argparse
 import glob
+import hashlib
 import json
 import os
 import re
@@ -93,28 +96,32 @@ def dtw_preset(model: Path) -> str | None:
     return os.environ.get("VF_WHISPER_DTW")
 
 
-def local_models_dir() -> Path | None:
-    """Optional: a local-models project (ivrit.ai Whisper behind `local-models transcribe`).
-    Sentence timings only — used when whisper.cpp is not available."""
-    env = os.environ.get("VF_LOCAL_MODELS")
-    if env:
-        return Path(env)
-    dev = os.environ.get("DEV_ROOT")
-    if dev and Path(dev, "local-models", "mcp").exists():
-        return Path(dev, "local-models", "mcp")
-    return None
+VERBOSE = os.environ.get("VF_VERBOSE", "") not in ("", "0")
 
 
 def run(cmd: list, **kw) -> subprocess.CompletedProcess:
-    print("  $", " ".join(str(c) for c in cmd), file=sys.stderr)
+    if VERBOSE:
+        print("  $", " ".join(str(c) for c in cmd), file=sys.stderr)
     return subprocess.run([str(c) for c in cmd], env=tool_env(), **kw)
 
 
 def ff(tool: str, *args) -> None:
-    """Run one ffmpeg-skill script; stop on failure."""
-    r = run([sys.executable, SKILL_SCRIPTS / f"{tool}.py", *args])
+    """Run one ffmpeg-skill script; stop on failure. Quiet unless VF_VERBOSE=1: its own command
+    lines and JSON are shown only when it fails, with the reason it gave."""
+    cmd = [sys.executable, SKILL_SCRIPTS / f"{tool}.py", *args]
+    if VERBOSE:
+        r = run(cmd)
+    else:
+        r = run(cmd, capture_output=True, text=True)
     if r.returncode != 0:
-        sys.exit(f"ffmpeg-skill {tool} failed (exit {r.returncode})")
+        reason = ""
+        if not VERBOSE:
+            out = (r.stdout or "") + (r.stderr or "")
+            m = re.search(r'"message":\s*"([^"]+)"', out)
+            reason = m.group(1) if m else out.strip().splitlines()[-1] if out.strip() else ""
+            sys.stderr.write(out[-2500:] + "\n")
+        sys.exit(f"ffmpeg-skill {tool} failed (exit {r.returncode})" + (f": {reason}" if reason else "")
+                 + "\n  (run with VF_VERBOSE=1 to see every command)")
 
 
 def probe_duration(path: Path) -> float:
@@ -136,6 +143,8 @@ def project_dir(name: str) -> Path:
 
 def sources(proj: Path) -> dict[str, Path]:
     src = proj / "source"
+    if not src.is_dir():
+        return {}
     return {f.stem: f for f in sorted(src.iterdir()) if f.suffix.lower() in VIDEO_EXT}
 
 
@@ -244,33 +253,19 @@ def tokens_to_words(tokens: list[dict], seg_start: float, seg_end: float) -> lis
     return [w for w in words if w["word"]]
 
 
-def local_models_transcribe(path: Path, workdir: Path, a, lm: Path) -> list[dict]:
-    cmd = ["uv", "run", "-q", "--project", lm, "local-models", "transcribe", path,
-           "--out", workdir, "--language", a.language]
-    if a.prompt:
-        cmd += ["--prompt", a.prompt]
-    if a.presets:
-        cmd += ["--presets", a.presets]
-    if run(cmd).returncode != 0:
-        sys.exit("local-models transcription failed")
-    raw = json.loads(next(workdir.glob("*.json")).read_text(encoding="utf-8"))
-    return [{"start": s["start"] / 1000.0, "end": s["end"] / 1000.0, "text": s["text"].strip(), "words": []}
-            for s in raw.get("segments", [])]  # local-models reports milliseconds, no words
-
-
 # ---------------------------------------------------------------- commands
 
 def cmd_doctor(_a) -> None:
     ok = True
     b = ffmpeg_full_bin()
-    print(f"ffmpeg-full : {b or 'MISSING — brew install ffmpeg-full'}")
-    if b:
-        filters = subprocess.run([str(b / "ffmpeg"), "-hide_banner", "-filters"],
-                                 capture_output=True, text=True).stdout
+    exe = str(b / "ffmpeg") if b else shutil.which("ffmpeg")
+    print(f"ffmpeg      : {exe or 'MISSING — brew install ffmpeg-full (macOS) / your distro ffmpeg with libass'}")
+    if exe:
+        filters = subprocess.run([exe, "-hide_banner", "-filters"], capture_output=True, text=True).stdout
         for f in ("subtitles", "ass", "drawtext", "xfade", "tile"):
             has = f" {f} " in filters
             ok &= has
-            print(f"  filter {f:<10} {'ok' if has else 'MISSING'}")
+            print(f"  filter {f:<10} {'ok' if has else 'MISSING' + (' — needs libass (brew install ffmpeg-full)' if f in ('subtitles', 'ass') else '')}")
     else:
         ok = False
     has_skill = (SKILL_SCRIPTS / "cut.py").exists()
@@ -281,11 +276,21 @@ def cmd_doctor(_a) -> None:
     print(f"whisper-cli : {cli or 'MISSING — brew install whisper-cpp'}")
     print(f"model       : {m or 'MISSING — see README (ivrit.ai ggml model)'}"
           + (f"  [dtw {dtw_preset(m)}]" if m else ""))
-    lm = local_models_dir()
-    print(f"local-models: {lm or '— (optional fallback, sentence timings only)'}")
-    if not ((cli and m and m.exists()) or lm):
+    if not (cli and m and m.exists()):
         ok = False
-        print("no transcription engine available")
+        print("no transcription engine: whisper-cli and a model are both needed (docs/setup.md)")
+    node = shutil.which("node")
+    ver = subprocess.run([node, "--version"], capture_output=True, text=True).stdout.strip() if node else ""
+    major = int(ver.lstrip("v").split(".")[0]) if ver[1:2].isdigit() else 0
+    print(f"node        : {ver or 'MISSING'}"
+          + ("" if major >= 22 else "  — motion graphics need Node.js 22+ (brew install node)"))
+    print(f"npx         : {shutil.which('npx') or 'MISSING — comes with Node.js'}")
+    if not ok:
+        print("\nnot ready — fix the MISSING lines above (docs/setup.md)")
+    elif major < 22:
+        print("\nready for editing and captions; motion graphics need Node.js 22+")
+    else:
+        print("\nready")
     sys.exit(0 if ok else 1)
 
 
@@ -319,20 +324,35 @@ def is_cloud_placeholder(p: Path) -> bool:
 
 def cmd_new(a) -> None:
     inputs = expand_inputs(a.videos)  # fail before creating anything
+    clouds = [v for v in inputs if is_cloud_placeholder(v)]
+    if clouds:
+        sys.exit("not on disk yet (iCloud / Google Drive placeholders) — download them (Finder: "
+                 "Download Now) and run again:\n  " + "\n  ".join(str(v) for v in clouds))
+    if not re.fullmatch(r"[^/\\]+", a.name) or a.name.startswith("."):
+        sys.exit(f"project name {a.name!r}: use a plain folder name (no slashes)")
     proj = PROJECTS / a.name
     for sub in ("source", "transcript", "visual", "parts", "renders"):
         (proj / sub).mkdir(parents=True, exist_ok=True)
     for v in inputs:
-        if is_cloud_placeholder(v):
-            sys.exit(f"{v} is a cloud placeholder, not on disk yet — download it (Finder: "
-                     "Download Now) and run again")
-        dst = proj / "source" / v.name
-        if dst.exists() or dst.is_symlink():
-            same = dst.resolve() == v or (dst.exists() and dst.samefile(v))
-            if not same:
-                sys.exit(f"source/{v.name} already exists and is a different file — rename one of them")
-            print(f"  source {dst.name}: already there")
+        existing = {f.resolve(): f for f in (proj / "source").iterdir() if f.exists()}
+        vst = v.stat()
+        same_copy = next((f for f in (proj / "source").iterdir() if f.is_file() and not f.is_symlink()
+                          and f.suffix.lower() == v.suffix.lower() and f.stat().st_size == vst.st_size
+                          and int(f.stat().st_mtime) == int(vst.st_mtime)), None)  # copy2 keeps mtime
+        if v in existing or same_copy:
+            print(f"  source {(existing.get(v) or same_copy).name}: already there")
             continue
+        dst = proj / "source" / v.name
+        # a source is known by its name without the extension (transcripts, parts and story.json
+        # use it), so clip.mp4 and clip.mov — or two folders' clip.mp4 — must not share one
+        taken = {f.stem for f in (proj / "source").iterdir()}
+        if dst.exists() or dst.is_symlink() or v.stem in taken:
+            base, n = f"{v.stem}-{v.suffix.lstrip('.').lower()}", 2
+            cand = base
+            while cand in taken:
+                cand, n = f"{base}{n}", n + 1
+            dst = proj / "source" / f"{cand}{v.suffix}"
+            print(f"  note: another source is already called {v.stem!r} — this one is {cand!r}")
         if a.copy:
             shutil.copy2(v, dst)  # for removable drives, cloud folders, or originals about to move
             print(f"  source {dst.name}: copied from {v}")
@@ -347,11 +367,9 @@ def cmd_transcribe(a) -> None:
     plus <src>.srt for reading."""
     proj = project_dir(a.project)
     model = Path(a.model).expanduser() if a.model else whisper_model()
-    use_whisper = bool(model and model.exists() and shutil.which("whisper-cli")) and not a.local_models
-    lm = local_models_dir()
-    if not use_whisper and not lm:
-        sys.exit("no transcription engine: install whisper.cpp and an ivrit.ai ggml model (see README), "
-                 "or set VF_LOCAL_MODELS")
+    if not (model and model.exists() and shutil.which("whisper-cli")):
+        sys.exit("no transcription engine: install whisper.cpp and an ivrit.ai ggml model "
+                 "(docs/setup.md), or point VF_WHISPER_MODEL at a ggml model")
     for name, path in sources(proj).items():
         out_json = proj / "transcript" / f"{name}.json"
         if out_json.exists() and not a.force:
@@ -359,12 +377,8 @@ def cmd_transcribe(a) -> None:
             continue
         tmp = proj / "transcript" / f".{name}.raw"
         tmp.mkdir(exist_ok=True)
-        if use_whisper:
-            engine = f"whisper.cpp {model.parent.parent.parent.name if 'snapshots' in str(model) else model.name}"
-            segs = whisper_cpp_transcribe(path.resolve(), tmp, a.language, a.prompt, model)
-        else:
-            engine = "local-models (ivrit.ai whisper, sentence timings)"
-            segs = local_models_transcribe(path.resolve(), tmp, a, lm)
+        engine = f"whisper.cpp {model.parent.parent.parent.name if 'snapshots' in str(model) else model.name}"
+        segs = whisper_cpp_transcribe(path.resolve(), tmp, a.language, a.prompt, model)
         shutil.rmtree(tmp)
         data = {"meta": {"source": path.name, "engine": engine, "language": a.language, "units": "seconds",
                          "word_timings": any(s["words"] for s in segs)},
@@ -405,14 +419,14 @@ def cmd_frames(a) -> None:
     for name, path in sources(proj).items():
         dur = probe_duration(path)
         every = a.every or max(1.0, round(dur / 48, 1))  # ~4 sheets for any length by default
-        for old in out.glob(f"{name}_sheet_*.png"):
+        for old in out.glob(f"{glob.escape(name)}_sheet_*.png"):
             old.unlink()
         vf = (f"fps=1/{every},scale={a.width // 4}:-2,"
               f"drawtext=text='%{{pts\\:hms}}':x=6:y=6:fontsize=18:fontcolor=white:box=1:boxcolor=black@0.6,"
               f"tile=4x3:padding=4:color=black")
         run([ffbin("ffmpeg"), "-v", "error", "-y", "-i", path, "-vf", vf, "-fps_mode", "vfr",
              out / f"{name}_sheet_%03d.png"], check=True)
-        sheets = sorted(out.glob(f"{name}_sheet_*.png"))
+        sheets = sorted(out.glob(f"{glob.escape(name)}_sheet_*.png"))
         r = run([sys.executable, SKILL_SCRIPTS / "scenes.py", path, "--threshold", str(a.threshold), "--json"],
                 capture_output=True, text=True)
         scenes = []
@@ -425,6 +439,108 @@ def cmd_frames(a) -> None:
         print(f"  {name}: {dur:.1f}s, a tile every {every}s -> {len(sheets)} sheet(s), {len(scenes)} scene(s)")
         for s in sheets:
             print(f"    {s}")
+
+
+def cmd_reference(a) -> None:
+    """Study a reference video the user wants to imitate: pace, transitions, look, captions.
+    Writes reference/<name>/: shots.json (every shot and its length), sheets of the whole video,
+    and transitions.png — three frames around each cut, to tell a hard cut from a dissolve or wipe."""
+    proj = project_dir(a.project)
+    src = Path(a.video).expanduser().resolve()
+    if not src.is_file():
+        sys.exit(f"not found: {src} — for a URL, download it first (e.g. the /watch plugin, or yt-dlp)")
+    out = proj / "reference" / re.sub(r"[^\w.-]+", "_", src.stem)
+    out.mkdir(parents=True, exist_ok=True)
+    dur = probe_duration(src)
+    r = run([sys.executable, SKILL_SCRIPTS / "scenes.py", src, "--threshold", str(a.threshold), "--json"],
+            capture_output=True, text=True)
+    try:
+        shots = [{"start": round(x["start"], 2), "end": round(x["end"], 2), "length": round(x["end"] - x["start"], 2)}
+                 for x in json.loads(r.stdout).get("scenes", [])]
+    except (ValueError, KeyError):
+        shots = []
+    lengths = sorted(x["length"] for x in shots) or [dur]
+    median = lengths[len(lengths) // 2]
+    stats = {"file": str(src), "duration": round(dur, 2), "shots": len(shots), "median_shot": median,
+             "mean_shot": round(sum(lengths) / len(lengths), 2), "shortest": lengths[0], "longest": lengths[-1],
+             "cuts_per_minute": round(60 * max(len(shots) - 1, 0) / dur, 1) if dur else 0}
+    (out / "shots.json").write_text(json.dumps({"stats": stats, "shots": shots}, indent=1), encoding="utf-8")
+    every = a.every or max(0.5, round(dur / 48, 2))
+    for old in out.glob("sheet_*.png"):
+        old.unlink()
+    vf = (f"fps=1/{every},scale=320:-2,drawtext=text='%{{pts\\:hms}}':x=6:y=6:fontsize=18:fontcolor=white:"
+          f"box=1:boxcolor=black@0.6,tile=4x3:padding=4:color=black")
+    run([ffbin("ffmpeg"), "-v", "error", "-y", "-i", src, "-vf", vf, "-fps_mode", "vfr", out / "sheet_%03d.png"],
+        check=True)
+    # transitions: for the first cuts, the frames 0.3 s before, at, and 0.3 s after each cut
+    cuts = [x["start"] for x in shots[1:13]]
+    if cuts:
+        frames = []
+        for k, t in enumerate(cuts):
+            for j, dt in enumerate((-0.3, 0.0, 0.3)):
+                f = out / f".t{k:02d}_{j}.png"
+                run([ffbin("ffmpeg"), "-v", "error", "-y", "-ss", f"{max(0, t + dt):.3f}", "-i", src, "-frames:v", "1",
+                     "-vf", f"scale=320:-2,drawtext=text='cut {k + 1} {t + dt:.1f}s':x=6:y=6:fontsize=18:"
+                            f"fontcolor=white:box=1:boxcolor=black@0.6", f], check=True)
+                frames.append(f)
+        lst = out / ".t.txt"
+        lst.write_text("".join(f"file '{f.name}'\n" for f in frames), encoding="utf-8")
+        run([ffbin("ffmpeg"), "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", lst, "-vf",
+             f"tile=3x{len(cuts)}:padding=4:color=black", "-frames:v", "1", out / "transitions.png"], check=True)
+        for f in frames + [lst]:
+            f.unlink()
+    print(f"  {src.name}: {stats['duration']}s, {stats['shots']} shots, median shot {median}s, "
+          f"{stats['cuts_per_minute']} cuts/min")
+    print(f"  read: {out}/sheet_*.png (content, graphics, captions), {out}/transitions.png (how it cuts)")
+    print(f"  then write {out}/style.md and carry it into story.json")
+
+
+def cmd_status(a) -> None:
+    """Where each project stands, and the next step."""
+    import datetime
+    projs = [project_dir(a.project)] if a.project else sorted(
+        p for p in PROJECTS.iterdir() if p.is_dir() and (p / "source").is_dir()) if PROJECTS.exists() else []
+    if not projs:
+        print("no projects yet — python3 tools/vf.py new <name> <folder or files>")
+        return
+    for proj in projs:
+        srcs = sources(proj)
+        print(f"{proj.name}")
+        broken = [n for n, f in srcs.items() if not f.exists()]
+        for n in srcs:
+            tr = "transcript ✓" if (proj / "transcript" / f"{n}.json").exists() else "no transcript"
+            vis = ", visual notes ✓" if (proj / "visual" / f"{n}.json").exists() else ""
+            print(f"  source {n}: {tr}{vis}" + ("  — LINK BROKEN (original moved?)" if n in broken else ""))
+        for f, label in (("brief.md", "brief"), ("script.md", "script"), ("brand.json", "brand"),
+                         ("segments.json", "segments"), ("voice/voiceover.wav", "voice-over")):
+            if (proj / f).exists():
+                print(f"  {label}: ✓")
+        nxt = None
+        if (proj / "story.json").exists():
+            try:
+                st = json.loads((proj / "story.json").read_text(encoding="utf-8"))
+                ver = ", versions: " + ", ".join(st.get("versions", {})) if st.get("versions") else ""
+                print(f"  story: {len(st.get('parts', []))} parts{ver}")
+            except json.JSONDecodeError:
+                print("  story: INVALID JSON")
+        for r in sorted((proj / "renders").glob("*.mp4")):
+            when = datetime.datetime.fromtimestamp(r.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
+            print(f"  render {r.name}: {probe_duration(r):.1f}s, {when}")
+        if not srcs and not (proj / "script.md").exists():
+            nxt = "add footage: vf.py new " + proj.name + " <folder>"
+        elif srcs and not (proj / "script.md").exists() \
+                and any(not (proj / "transcript" / f"{n}.json").exists() for n in srcs):
+            nxt = "vf.py transcribe " + proj.name
+        elif (proj / "script.md").exists() and not (proj / "voice" / "voiceover.wav").exists():
+            nxt = "vf.py voice " + proj.name
+        elif not (proj / "story.json").exists():
+            nxt = "write story.json (Claude proposes it, you approve)"
+        elif not (proj / "renders" / "draft.mp4").exists() and not (proj / "renders" / "final.mp4").exists():
+            nxt = "vf.py render " + proj.name + " --draft"
+        if broken:
+            nxt = "relink the moved originals: vf.py new " + proj.name + " <their new folder>"
+        if nxt:
+            print(f"  next: {nxt}")
 
 
 def cmd_scenes(a) -> None:
@@ -460,7 +576,9 @@ def keep_ranges(p: dict, words: list[dict], fillers: set[str]) -> tuple[list[tup
     if "fillers" in clean:
         for i, w in inside:
             if norm_word(w["word"]) in fillers:
-                cuts.append((w["start"] - FILLER_PAD, w["end"] + FILLER_PAD))
+                lo = max(w["start"] - FILLER_PAD, words[i - 1]["end"] if i > 0 else -1e9)
+                hi = min(w["end"] + FILLER_PAD, words[i + 1]["start"] if i + 1 < len(words) else 1e9)
+                cuts.append((lo, hi))
                 removed.add(i)
     if "pauses" in clean:
         max_pause = float(p.get("max_pause", 0.6))
@@ -490,8 +608,8 @@ def mapper(ranges: list[tuple[float, float]], offset: float):
     def f(t: float, snap: str = "none") -> float | None:
         acc = 0.0
         for r0, r1 in ranges:
-            if t < r0:
-                return offset + acc if snap == "next" else None
+            if t < r0:  # inside a cut (or before the part): next = where the next range starts,
+                return offset + acc if snap in ("next", "prev") else None  # prev = where the last one ended
             if t <= r1:
                 return offset + acc + (t - r0)
             acc += r1 - r0
@@ -575,12 +693,106 @@ def write_caption_files(proj: Path, cues: list[dict], stem: str) -> Path:
 def deep_merge(base: dict, over: dict) -> dict:
     out = dict(base)
     for k, v in over.items():
-        out[k] = deep_merge(out[k], v) if isinstance(v, dict) and isinstance(out.get(k), dict) else v
+        if isinstance(v, dict) and v and isinstance(out.get(k), dict):
+            out[k] = deep_merge(out[k], v)
+        else:  # a value, null, or {} (= "none of these in this version") replaces the story's
+            out[k] = v
     return out
 
 
+def read_json(path: Path, what: str) -> dict:
+    if not path.exists():
+        sys.exit(f"{what} not found: {path}")
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        line = path.read_text(encoding="utf-8").splitlines()[e.lineno - 1] if e.lineno else ""
+        sys.exit(f"{path.name}: invalid JSON at line {e.lineno}, column {e.colno}: {e.msg}\n  {line.strip()[:120]}")
+
+
+def validate_story(proj: Path, story: dict, srcs: dict[str, Path]) -> None:
+    """Every problem a render would hit late — found before anything is rendered, all at once."""
+    import vf_motion
+    errs, warns = [], []
+    parts = story.get("parts") or []
+    if not parts:
+        errs.append("story has no parts")
+    ids = [p.get("id") for p in parts]
+    dupes = sorted({i for i in ids if ids.count(i) > 1 and i})
+    if dupes:
+        errs.append(f"duplicate part id(s): {dupes}")
+    tr = story.get("transition", {"type": "fade", "duration": 0.5})
+    tdur = 0.0 if tr.get("type") == "none" else float(tr.get("duration", 0.5))
+    no_transcript = set()
+    for i, p in enumerate(parts):
+        pid = p.get("id") or f"#{i + 1}"
+        if not p.get("id"):
+            errs.append(f"part {pid}: needs an id")
+        if "motion" in p:
+            try:
+                vf_motion.template_dir(proj, p["motion"].get("template", ""), quiet=True)
+            except LookupError as e:
+                errs.append(f"part {pid}: {e}")
+            length = float(p["motion"].get("duration") or vf_motion.DEFAULT_DURATION.get(p["motion"].get("template"), 5))
+        else:
+            if p.get("source") not in srcs:
+                errs.append(f"part {pid}: unknown source {p.get('source')!r} (have: {', '.join(srcs) or 'none'})")
+                continue
+            if "start" not in p or "end" not in p or float(p["end"]) <= float(p["start"]):
+                errs.append(f"part {pid}: needs start < end")
+                continue
+            length = float(p["end"]) - float(p["start"])
+            if not (proj / "transcript" / f"{p['source']}.json").exists():
+                no_transcript.add(p["source"])
+        # a clip shorter than its transitions cannot be crossfaded: interior parts take two
+        need = tdur * (2 if 0 < i < len(parts) - 1 else 1) + 0.1 if len(parts) > 1 and tdur else 0
+        if need and length < need:
+            errs.append(f"part {pid}: {length:.2f}s is too short for {tdur:g}s transitions "
+                        f"(needs more than {need:.2f}s) — lengthen it or shorten transition.duration")
+    known = set(ids)
+    for kind in ("overlays", "broll"):
+        for o in story.get(kind, []):
+            if "part" in o and o["part"] not in known and not o.get("whole"):
+                warns.append(f"{kind}: part {o['part']!r} is not in this edit — skipped")
+            if "motion" in o:
+                try:
+                    vf_motion.template_dir(proj, o["motion"].get("template", ""), quiet=True)
+                except LookupError as e:
+                    errs.append(f"{kind}: {e}")
+            if kind == "broll" and "source" in o and o["source"] not in srcs:
+                errs.append(f"broll: unknown source {o['source']!r}")
+            if o.get("image") and not (proj / o["image"]).exists():
+                errs.append(f"overlay image not found: {o['image']}")
+            if o.get("logo") and not vf_motion.load_brand(proj).get("logo"):
+                errs.append("overlay logo: brand.json has no logo")
+    for key, label in (("music", "music file"), ("voiceover", "voice-over file")):
+        if story.get(key):
+            f = story[key].get("file", "voice/voiceover.wav" if key == "voiceover" else "")
+            if not f or not (proj / f).exists():
+                errs.append(f"{label} not found: {f or '(no file given)'}"
+                            + (" — run vf.py voice first" if key == "voiceover" else ""))
+    if story.get("look", {}).get("lut") and not (proj / story["look"]["lut"]).exists():
+        errs.append(f"LUT not found: {story['look']['lut']}")
+    cap = story.get("captions", {})
+    if cap.get("enabled", True):
+        if story.get("voiceover") and cap.get("source", "voiceover") == "voiceover" \
+                and not (proj / "transcript" / "voiceover.json").exists():
+            warns.append("captions follow the voice-over, but it has no transcript (run vf.py voice "
+                         "with a whisper model) — no captions")
+        elif no_transcript and cap.get("source", "voiceover" if story.get("voiceover") else "parts") == "parts":
+            warns.append(f"no transcript for {', '.join(sorted(no_transcript))} — those parts get no captions "
+                         "(run vf.py transcribe)")
+        for lang, t in cap.get("translations", {}).items():
+            if not (proj / t.get("file", f"translations/{lang}.json")).exists():
+                errs.append(f"translation {lang}: {t.get('file', f'translations/{lang}.json')} not found")
+    for w in warns:
+        print(f"  note: {w}", file=sys.stderr)
+    if errs:
+        sys.exit("story.json has problems — nothing was rendered:\n  - " + "\n  - ".join(errs))
+
+
 def load_story(proj: Path, version: str | None) -> dict:
-    story = json.loads((proj / "story.json").read_text(encoding="utf-8"))
+    story = read_json(proj / "story.json", "story.json (write the edit first — see docs/story-json.md)")
     if not version:
         return story
     versions = story.get("versions", {})
@@ -598,18 +810,34 @@ def load_story(proj: Path, version: str | None) -> dict:
     return merged
 
 
-def frame_size(story: dict, srcs: dict[str, Path]) -> tuple[int, int, int]:
+def frame_size(story: dict, srcs: dict[str, Path]) -> tuple[int, int, float]:
+    """Output size: story.output, else the first footage part's source as it is displayed
+    (a phone clip stored landscape with a 90° rotation is portrait), else 1920x1080."""
     out = story.get("output", {})
     w, h = out.get("width"), out.get("height")
     if not (w and h):
-        first = next(iter(srcs.values()), None)
+        first = next((srcs[p["source"]] for p in story.get("parts", []) if p.get("source") in srcs), None)
         if first:
             r = subprocess.run([ffbin("ffprobe"), "-v", "error", "-select_streams", "v:0", "-show_entries",
-                                "stream=width,height", "-of", "csv=p=0", str(first)], capture_output=True, text=True)
-            w, h = (int(x) for x in r.stdout.strip().split(",")[:2])
+                                "stream=width,height:stream_side_data=rotation:stream_tags=rotate", "-of", "json",
+                                str(first)], capture_output=True, text=True)
+            st = json.loads(r.stdout or "{}").get("streams", [{}])[0]
+            w, h = int(st.get("width", 1920)), int(st.get("height", 1080))
+            rot = st.get("tags", {}).get("rotate") or next(
+                (d.get("rotation") for d in st.get("side_data_list", []) if "rotation" in d), 0)
+            if abs(int(float(rot or 0))) % 180 == 90:
+                w, h = h, w
         else:
             w, h = 1920, 1080
-    return int(w), int(h), int(out.get("fps", 30))
+    return int(w), int(h), float(out.get("fps", 30))
+
+
+def fps_arg(fps: float) -> str:
+    """29.97 / 23.976 / 59.94 as the exact NTSC rationals; whole rates as integers."""
+    for nominal, rational in ((29.97, "30000/1001"), (23.976, "24000/1001"), (59.94, "60000/1001")):
+        if abs(fps - nominal) < 0.01:
+            return rational
+    return f"{fps:g}"
 
 
 def plan_parts(proj: Path, story: dict, srcs: dict[str, Path]) -> list[dict]:
@@ -656,9 +884,13 @@ def cmd_render(a) -> None:
     import vf_motion
     proj = project_dir(a.project)
     story = load_story(proj, a.version)
-    name = a.version or ("draft" if a.draft else "final")
+    name = (f"{a.version}_draft" if a.draft else a.version) if a.version else ("draft" if a.draft else "final")
     srcs = sources(proj)
+    validate_story(proj, story, srcs)
+    for old in list(proj.glob("captions*.srt")) + list(proj.glob("captions*.words.json")):
+        old.unlink()  # this render's captions only — a stale file would hide a render that made none
     W, H, FPS = frame_size(story, srcs)
+    FPS = fps_arg(FPS)
     tr = story.get("transition", {"type": "fade", "duration": 0.5})
     ttype, tdur = tr.get("type", "fade"), float(tr.get("duration", 0.5))
     if ttype == "none":
@@ -670,6 +902,17 @@ def cmd_render(a) -> None:
     # 1. parts: footage cut frame-accurate (cached by kept ranges); motion cards rendered
     plan, part_files, offset = [], [], 0.0
     items = plan_parts(proj, story, srcs)
+    short = []
+    for i, it in enumerate(items):
+        if it["ranges"] is None:
+            continue
+        kept = sum(r1 - r0 for r0, r1 in it["ranges"])
+        need = tdur * (2 if 0 < i < len(items) - 1 else 1) + 0.1 if len(items) > 1 and tdur else 0.1
+        if kept < need:
+            short.append(f"part {it['part']['id']}: {kept:.2f}s left after snapping/cleaning"
+                         + (f", needs more than {need:.2f}s for its transitions" if need > 0.1 else " — nothing to cut"))
+    if short:
+        sys.exit("story.json has problems — nothing was rendered:\n  - " + "\n  - ".join(short))
     for i, it in enumerate(items):
         p = it["part"]
         if it["ranges"] is None:
@@ -680,7 +923,8 @@ def cmd_render(a) -> None:
         else:
             ranges = it["ranges"]
             f = proj / "parts" / f"{p['id']}.mp4"
-            sig = json.dumps(ranges)
+            src_st = srcs[p["source"]].stat()
+            sig = json.dumps([ranges, str(srcs[p["source"]].resolve()), src_st.st_size, int(src_st.st_mtime)])
             sigf = f.with_suffix(".ranges.json")
             if a.force or not f.exists() or not sigf.exists() or sigf.read_text() != sig:
                 ff("cut", srcs[p["source"]], "--segments", ",".join(f"{r0}-{r1}" for r0, r1 in ranges),
@@ -700,7 +944,8 @@ def cmd_render(a) -> None:
     # 2. join with transitions, normalising size / fps / audio
     cur = stage(stages, "1-joined")
     if len(part_files) == 1:
-        ff("fit", part_files[0], "--width", str(W), "--height", str(H), "-o", cur, "--overwrite", "--json-brief")
+        ff("fit", part_files[0], "--width", str(W), "--height", str(H), "--fit", story.get("fit", "pad"),
+           "--fps", str(FPS), "-o", cur, "--overwrite", "--json-brief", *fast)
     else:
         args = [*part_files, "--transition", ttype, "-o", cur, "--overwrite", "--json-brief",
                 "--width", str(W), "--height", str(H), "--fps", str(FPS), "--fit", story.get("fit", "pad"), *fast]
@@ -715,7 +960,8 @@ def cmd_render(a) -> None:
         if t is None:
             continue
         if "motion" in b:
-            ins = proj / "parts" / f"broll_{abs(hash(json.dumps(b, sort_keys=True))) % 10**8}_{W}x{H}.mp4"
+            bkey = hashlib.sha256(json.dumps(b["motion"], sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:12]
+            ins = proj / "parts" / f"broll_{bkey}_{W}x{H}.mp4"
             vf_motion.render_motion(proj, b["motion"], ins, W, H, FPS, alpha=False, draft=a.draft)
             frm = 0.0
         else:
@@ -735,18 +981,20 @@ def cmd_render(a) -> None:
     # 4. look: one colour pass over the whole edit
     look = story.get("look")
     if look:
-        nxt = stage(stages, "3-look")
-        args = [cur, "-o", nxt, "--overwrite", "--json-brief"]
-        if look.get("lut"):
-            args += ["--lut", str((proj / look["lut"]).resolve())]
-            if "lut_strength" in look:
-                args += ["--lut-strength", str(look["lut_strength"])]
         corr = {k: look[k] for k in ("exposure", "contrast", "saturation", "temperature", "tint", "gamma",
                                      "lift", "gain") if k in look}
-        if corr:
-            args += ["--correct"] + [x for k, v in corr.items() for x in (f"--{k}", str(v))]
-        ff("color", *args, *fast)
-        cur = nxt
+        if corr:  # correction first (white balance, exposure), then the creative LUT on top
+            nxt = stage(stages, "3-correct")
+            ff("color", cur, "--correct", *[x for k, v in corr.items() for x in (f"--{k}", str(v))],
+               "-o", nxt, "--overwrite", "--json-brief", *fast)
+            cur = nxt
+        if look.get("lut"):
+            nxt = stage(stages, "3-lut")
+            args = [cur, "--lut", str((proj / look["lut"]).resolve()), "-o", nxt, "--overwrite", "--json-brief"]
+            if "lut_strength" in look:
+                args += ["--lut-strength", str(look["lut_strength"])]
+            ff("color", *args, *fast)
+            cur = nxt
 
     # 5. overlays: motion graphics with alpha (lower thirds, stats…), images, the brand logo
     motion_layers, image_layers = [], []
@@ -841,7 +1089,9 @@ def cmd_render(a) -> None:
             args = [cur, "--srt", f"{srt}:{lang}", "--language", lang, "--position", cap.get("position", "bottom"),
                     "--max-lines", str(cap.get("max_lines", 2)), "-o", nxt, "--overwrite", "--json-brief"]
             brand = vf_motion.load_brand(proj)
-            args += ["--font", cap.get("font") or brand.get("font") or "Arial Hebrew"]
+            font = cap.get("font") or brand.get("font") or ("Arial Hebrew" if sys.platform == "darwin" else "")
+            if font:  # elsewhere caption.py picks an installed font that has the script's glyphs
+                args += ["--font", font]
             if brand_file.exists():
                 args += ["--brand", brand_file]
             for key, flag in (("size", "--size"), ("animate", "--animate")):
@@ -860,6 +1110,10 @@ def cmd_render(a) -> None:
                 table = json.loads(tfile.read_text(encoding="utf-8")).get("cues", {})
                 tcues = [{**c, "text": table[c["key"]], "words": []} for c in cues if c["key"] in table]
                 missing = len(cues) - len(tcues)
+                if not tcues:
+                    print(f"  subtitles {tlang}: no cue translated (ids in {tfile.name} match none of "
+                          f"{', '.join(c['key'] for c in cues[:4])}…) — skipped", file=sys.stderr)
+                    continue
                 tsrt = write_caption_files(proj, tcues, f"captions.{tlang}")
                 nxt = stage(stages, f"9-sub-{tlang}")
                 if tconf.get("mode", "mux") == "mux":
@@ -884,7 +1138,43 @@ def cmd_render(a) -> None:
     ff("look", final, "--tiles", "3x2", "-o", proj / "renders" / f"{name}_sheet.png", "--overwrite", "--json-brief")
     if not a.keep_stages:
         shutil.rmtree(stages, ignore_errors=True)
+    problems = qa_check(final, offset, W, H, story, cap)
     print(f"done: {final}  ({probe_duration(final):.2f}s, planned {offset:.2f}s, {W}x{H}@{FPS})")
+    if problems:
+        print("QA: " + "; ".join(problems) + " — look before delivering", file=sys.stderr)
+        sys.exit(2)
+    print("QA: ok (length, size, video and audio streams, captions)")
+
+
+def qa_check(final: Path, planned: float, W: int, H: int, story: dict, cap: dict) -> list[str]:
+    """What a render must be before it is reported as done."""
+    r = subprocess.run([ffbin("ffprobe"), "-v", "error", "-show_entries",
+                        "stream=codec_type,width,height:format=duration", "-of", "json", str(final)],
+                       capture_output=True, text=True)
+    try:
+        d = json.loads(r.stdout)
+    except ValueError:
+        return ["the file cannot be read"]
+    streams = d.get("streams", [])
+    v = [s for s in streams if s.get("codec_type") == "video"]
+    out = []
+    if not v:
+        out.append("no video stream")
+    elif (v[0].get("width"), v[0].get("height")) != (W, H):
+        out.append(f"size {v[0].get('width')}x{v[0].get('height')}, expected {W}x{H}")
+    if not any(s.get("codec_type") == "audio" for s in streams):
+        out.append("no audio stream")
+    dur = float(d.get("format", {}).get("duration", 0))
+    if abs(dur - planned) > max(0.3, planned * 0.02):
+        out.append(f"length {dur:.2f}s, planned {planned:.2f}s")
+    if cap.get("enabled", True) and not (final.parent.parent / "captions.srt").exists():
+        out.append("captions were expected but none were made")
+    langs = cap.get("translations", {})
+    subs = sum(1 for s in streams if s.get("codec_type") == "subtitle")
+    muxed = sum(1 for t in langs.values() if t.get("mode", "mux") == "mux")
+    if subs < muxed:
+        out.append(f"{muxed} subtitle track(s) expected, {subs} found")
+    return out
 
 
 def cmd_voice(a) -> None:
@@ -945,10 +1235,12 @@ def cmd_beats(a) -> None:
         d = json.loads(r.stdout)
     except ValueError:
         sys.exit(r.stdout[-1500:] + r.stderr[-1500:])
-    beats = d.get("beats") or d.get("beat_grid") or {}
-    times = beats.get("times") or beats.get("beat_times") or d.get("beat_times") or []
-    tempo = beats.get("tempo") or d.get("tempo")
-    print(f"  tempo: {tempo} BPM, {len(times)} beats, confidence {beats.get('confidence', d.get('confidence'))}")
+    grid = d.get("beat_grid") or {}
+    times = d.get("beats") if isinstance(d.get("beats"), list) else grid.get("beats", [])
+    tempo = grid.get("tempo_bpm") or grid.get("tempo")
+    print(f"  tempo: {tempo or '?'} BPM, {len(times)} beats, confidence {grid.get('confidence', '?')}")
+    if not times:
+        print("  no beat found — a track without a clear pulse; cut by phrase instead")
     if times:
         bar = [round(t, 2) for t in times[::4]]
         print(f"  every 4th beat (bar starts): {bar[:40]}{' …' if len(bar) > 40 else ''}")
@@ -963,7 +1255,7 @@ def cmd_review(a) -> None:
     video = proj / "renders" / f"{name}.mp4"
     if not video.exists():
         sys.exit(f"{video} not found — render it first")
-    story = json.loads((proj / "story.json").read_text(encoding="utf-8")) if (proj / "story.json").exists() else {}
+    story = read_json(proj / "story.json", "story.json") if (proj / "story.json").exists() else {}
     page = vf_review.write_review(proj, video, story.get("title", proj.name))
     print(f"  {page}\n  send the client the renders/ folder (or both files); notes come back as text")
 
@@ -973,7 +1265,9 @@ def cmd_export(a) -> None:
     proj = project_dir(a.project)
     story = load_story(proj, a.version)
     srcs = sources(proj)
+    validate_story(proj, story, srcs)
     W, H, FPS = frame_size(story, srcs)
+    FPS = fps_arg(FPS)
     clips = []
     multi = False
     for it in plan_parts(proj, story, srcs):
@@ -1006,7 +1300,7 @@ def main() -> None:
     sub.add_parser("doctor").set_defaults(fn=cmd_doctor)
 
     p = sub.add_parser("new", help="create a project from video files and/or folders of videos")
-    p.add_argument("name"); p.add_argument("videos", nargs="+", help="video files or folders")
+    p.add_argument("name"); p.add_argument("videos", nargs="*", help="video files or folders (none: an empty project)")
     p.add_argument("--copy", action="store_true",
                    help="copy the sources in instead of linking (external drive, cloud folder, "
                         "or originals you will move)")
@@ -1015,8 +1309,6 @@ def main() -> None:
     p = sub.add_parser("transcribe"); p.add_argument("project"); p.add_argument("--language", default="he")
     p.add_argument("--prompt", default="", help="names and terms, as a short sentence")
     p.add_argument("--model", default="", help="a whisper.cpp ggml model (default: VF_WHISPER_MODEL / ivrit.ai)")
-    p.add_argument("--local-models", action="store_true", help="use local-models (no word timings)")
-    p.add_argument("--presets", default="", help="local-models only: bias dictionaries")
     p.add_argument("--force", action="store_true"); p.set_defaults(fn=cmd_transcribe)
 
     p = sub.add_parser("transcript"); p.add_argument("project")
@@ -1027,6 +1319,14 @@ def main() -> None:
     p.add_argument("--every", type=float, default=0, help="seconds between tiles (default: ~48 tiles per source)")
     p.add_argument("--width", type=int, default=1280); p.add_argument("--threshold", type=float, default=0.3)
     p.set_defaults(fn=cmd_frames)
+
+    p = sub.add_parser("reference", help="study a video to imitate: pace, transitions, look, captions")
+    p.add_argument("project"); p.add_argument("video")
+    p.add_argument("--every", type=float, default=0, help="seconds between tiles (default ~48 tiles)")
+    p.add_argument("--threshold", type=float, default=0.3); p.set_defaults(fn=cmd_reference)
+
+    p = sub.add_parser("status", help="where each project stands, and the next step")
+    p.add_argument("project", nargs="?", default=""); p.set_defaults(fn=cmd_status)
 
     p = sub.add_parser("scenes"); p.add_argument("project"); p.add_argument("--threshold", type=float, default=0.3)
     p.set_defaults(fn=cmd_scenes)
@@ -1039,7 +1339,9 @@ def main() -> None:
 
     p = sub.add_parser("voice", help="narration from script.md with a TTS provider")
     p.add_argument("project"); p.add_argument("--script", default="script.md")
-    p.add_argument("--provider", default="say", choices=["elevenlabs", "azure", "google", "openai", "say"])
+    p.add_argument("--provider", default="say" if sys.platform == "darwin" else None,
+                   choices=["elevenlabs", "azure", "google", "openai", "say"],
+                   required=sys.platform != "darwin")
     p.add_argument("--voice", default=""); p.add_argument("--model", default="")
     p.add_argument("--language", default="he"); p.add_argument("--speed", type=float, default=1.0)
     p.add_argument("--gap", type=float, default=0.6, help="seconds of silence between beats")

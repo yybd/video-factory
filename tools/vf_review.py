@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import html
+import urllib.parse
 import json
 import subprocess
 import sys
@@ -90,7 +91,7 @@ def write_review(proj: Path, video: Path, title: str) -> Path:
     out = video.parent / f"{video.stem}_review.html"
     page = (REVIEW_HTML.replace("__TITLE__", html.escape(title))
             .replace("__SUB__", html.escape(f"{video.name} · לחצו על זמן כדי לקפוץ אליו"))
-            .replace("__VIDEO__", html.escape(video.name))
+            .replace("__VIDEO__", html.escape(urllib.parse.quote(video.name)))
             .replace("__KEY__", html.escape(f"{proj.name}-{video.stem}")))
     out.write_text(page, encoding="utf-8")
     return out
@@ -106,6 +107,7 @@ def export_timeline(proj: Path, story: dict, clips: list[dict], transition: dict
           "transition": transition}
     pf = proj / "renders" / "timeline_project.json"
     pf.write_text(json.dumps(pj, ensure_ascii=False, indent=1), encoding="utf-8")
-    r = run([sys.executable, skill_scripts / "render.py", pf, "--export-timeline", dest])
+    r = run([sys.executable, skill_scripts / "render.py", pf, "--export-timeline", dest, "--overwrite"],
+            capture_output=True, text=True)
     if r.returncode != 0:
-        sys.exit("timeline export failed")
+        sys.exit("timeline export failed: " + ((r.stderr or r.stdout).strip().splitlines() or ["?"])[0])

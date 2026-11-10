@@ -22,13 +22,18 @@ TEMPLATES = ROOT / "templates" / "motion"
 DEFAULT_DURATION = {"lower-third": 5, "title": 4, "end-card": 5, "stat": 4, "bar-chart": 6}
 
 
-def template_dir(proj: Path, name: str) -> Path:
-    for cand in (proj / "motion" / name, TEMPLATES / name, Path(name).expanduser()):
-        if (cand / "index.html").exists():
-            return cand.resolve()
+def template_dir(proj: Path, name: str, quiet: bool = False) -> Path:
+    """The template's folder. quiet=True raises LookupError instead of exiting (for validation)."""
+    if name:
+        for cand in (proj / "motion" / name, TEMPLATES / name, Path(name).expanduser()):
+            if (cand / "index.html").exists():
+                return cand.resolve()
     have = sorted(p.name for p in TEMPLATES.iterdir() if (p / "index.html").exists())
-    sys.exit(f"motion template not found: {name!r} (built-in: {', '.join(have)}; or a folder with "
-             "index.html under projects/<name>/motion/)")
+    msg = (f"motion template not found: {name!r} (built-in: {', '.join(have)}; or a folder with "
+           "index.html under projects/<name>/motion/)")
+    if quiet:
+        raise LookupError(msg)
+    sys.exit(msg)
 
 
 def load_brand(proj: Path) -> dict:
@@ -81,6 +86,9 @@ def render_motion(proj: Path, spec: dict, out: Path, width: int, height: int, fp
             h.update(f.name.encode()); h.update(f.read_bytes())
     h.update(json.dumps([variables, duration, width, height, fps, alpha, draft, logo, font],
                         sort_keys=True, ensure_ascii=False).encode())
+    for asset in (logo, font):  # the file's content, not just its name
+        if asset and Path(asset).exists():
+            h.update(Path(asset).read_bytes())
     key = h.hexdigest()[:16]
     stamp = out.with_suffix(out.suffix + ".key")
     if out.exists() and stamp.exists() and stamp.read_text() == key:

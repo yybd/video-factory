@@ -80,7 +80,9 @@ def synth(provider: str, text: str, voice: str, out: Path, lang: str, model: str
         key = need("ELEVENLABS_API_KEY", provider)
         if not voice:
             sys.exit("elevenlabs: pass --voice <voice id> (from your ElevenLabs voice library)")
-        body = {"text": text, "model_id": model or "eleven_v3", "language_code": lang}
+        body = {"text": text, "model_id": model or "eleven_v3"}
+        if body["model_id"] in ("eleven_v3", "eleven_turbo_v2_5", "eleven_flash_v2_5"):
+            body["language_code"] = lang  # only these models accept it; others detect the language
         if speed != 1.0:
             body["voice_settings"] = {"speed": speed}
         audio = _post(f"https://api.elevenlabs.io/v1/text-to-speech/{voice}?output_format=mp3_44100_128",
@@ -89,9 +91,12 @@ def synth(provider: str, text: str, voice: str, out: Path, lang: str, model: str
     elif provider == "azure":
         key = need("AZURE_SPEECH_KEY", provider)
         region = need("AZURE_SPEECH_REGION", provider)
-        voice = voice or "he-IL-HilaNeural"
+        voice = voice or ("he-IL-HilaNeural" if lang == "he" else "")
+        if not voice:
+            sys.exit(f"azure: pass --voice for language {lang!r} (e.g. en-US-JennyNeural)")
+        locale = "-".join(voice.split("-")[:2])  # the voice's own locale, e.g. he-IL
         rate = f"{(speed - 1) * 100:+.0f}%"
-        ssml = (f'<speak version="1.0" xml:lang="{lang}-IL" xmlns="http://www.w3.org/2001/10/synthesis">'
+        ssml = (f'<speak version="1.0" xml:lang="{locale}" xmlns="http://www.w3.org/2001/10/synthesis">'
                 f'<voice name="{voice}"><prosody rate="{rate}">{escape(text)}</prosody></voice></speak>')
         audio = _post(f"https://{region}.tts.speech.microsoft.com/cognitiveservices/v1", ssml.encode(),
                       {"Ocp-Apim-Subscription-Key": key, "Content-Type": "application/ssml+xml",
@@ -137,11 +142,19 @@ def make_voiceover(proj: Path, script: Path, provider: str, voice: str, lang: st
     old = json.loads(meta_f.read_text(encoding="utf-8")) if meta_f.exists() else {}
     old_beats = {b["n"]: b for b in old.get("beats", [])}
     rows, t = [], 0.0
+    sound = {"provider": provider, "voice": voice, "model": model, "speed": speed, "language": lang}
     for n, text in enumerate(beats, 1):
         wav = vdir / f"beat_{n:02d}.wav"
-        same = (old_beats.get(n, {}).get("text") == text and old.get("provider") == provider
-                and old.get("voice") == voice and wav.exists())
-        if not same and (only is None or n in only):
+        prev = old_beats.get(n, {})
+        same = prev.get("text") == text and prev.get("sound") == sound and wav.exists()
+        redo = not same and (only is None or n in only)
+        if not same and not redo and wav.exists():
+            # left out of --only: keep its old audio, and record the text that audio actually says
+            text, row_sound = prev.get("text", text), prev.get("sound", sound)
+            print(f"  beat {n}: changed, kept as it was (not in --only)", file=sys.stderr)
+        else:
+            row_sound = sound
+        if redo:
             for f in list(vdir.glob(f"beat_{n:02d}.*")) + list(vdir.glob(f"raw_{n:02d}.*")):
                 f.unlink()
             print(f"  beat {n}: {provider} {voice or ''} — {text[:60]}…", file=sys.stderr)
@@ -157,7 +170,8 @@ def make_voiceover(proj: Path, script: Path, provider: str, voice: str, lang: st
             sys.exit(f"beat {n} has no audio yet — run without --only first")
         dur = float(subprocess.run([ffbin("ffprobe"), "-v", "error", "-show_entries", "format=duration",
                                     "-of", "csv=p=0", str(wav)], capture_output=True, text=True).stdout)
-        rows.append({"n": n, "text": text, "start": round(t, 3), "end": round(t + dur, 3), "file": wav.name})
+        rows.append({"n": n, "text": text, "start": round(t, 3), "end": round(t + dur, 3), "file": wav.name,
+                     "sound": row_sound})
         t += dur + gap
     # join: beat, gap of silence, beat …
     lst = vdir / "concat.txt"

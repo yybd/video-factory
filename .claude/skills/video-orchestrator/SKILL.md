@@ -51,6 +51,17 @@ graphics each claim needs (a number → stat, a trend → bar-chart). For a scri
 `script.md` (see Script-led). After filming, check coverage: compare `shotlist.md` with the
 transcripts and `visual/*.json` and tell the user what is missing before editing.
 
+### 0b. Reference (when the user shows an example: "like this ad", a clip of transitions they like)
+`python3 tools/vf.py reference <name> <video>` writes shot lengths, sheets and `transitions.png` (three
+frames around each cut). Read them and write `reference/<video>/style.md`: pace (median shot, cuts
+per minute), transition kinds and lengths, caption look and position, graphics (what, when,
+where), colour, music energy. Then apply it: part lengths near the median shot, the closest
+`transition.type`, and caption `size`/`position`/`animate`/`karaoke_style`. Rebuild a graphic
+style the templates lack as a custom HyperFrames composition (`/reverse-any-video` rebuilds a
+whole reference as an editable composition). Tell the user what you could not match.
+A URL: download it first (`/watch` plugin or yt-dlp), never stream client footage to a cloud
+model.
+
 ### 1. Intake
 `python3 tools/vf.py new <name> <video-or-folder>...` creates the project and **links** the
 sources (a folder adds its top-level videos). The user prepares nothing. `--copy` is only for an
@@ -59,6 +70,8 @@ downloaded is refused, so tell the user to download it. Several cameras of one t
 `python3 tools/vf.py ff multicam a.mp4 b.mp4 --switch energy -o projects/<name>/source/multicam.mp4`
 first, then work from `multicam`.
 Ask for the goal only if it changes the edit: destination (16:9 / 9:16), length, audience.
+Picking up an existing project: `python3 tools/vf.py status <name>` first. It shows what is done
+and the next step. A project with no footage yet (script-led): `vf.py new <name>`.
 
 ### 2a. Transcribe (speech)
 `python3 tools/vf.py transcribe <name> [--prompt "names and terms"]` gives Hebrew with a time
@@ -92,6 +105,10 @@ time: where the brand's title card, lower thirds, stats, charts, b-roll and end 
 `python3 tools/vf.py render <name> --draft` writes `renders/draft.mp4` and `draft_sheet.png`. Read the
 sheet. Check that captions are inside the frame and right-to-left, that no graphic covers a
 caption or a face, and that the logo does not fight a lower third.
+
+Every render ends with a QA check (length vs plan, size, streams, captions, subtitle tracks).
+Exit code 2 = something is off. Never report such a render as done; fix the cause first.
+`story.json` is validated before anything renders, and all its problems are listed at once.
 
 ### 6. Fix captions
 Correct wording in `captions.cues` (`{"id": "<source>:<segment #>", "text": ...}`; the `#N` from
