@@ -445,8 +445,11 @@ def cmd_transcribe(a) -> None:
         if lang == "auto" and detected != "auto":
             print(f"  {name}: detected {vf_lang.name(detected)} ({detected})")
             if detected == "he" and hebrew_model() and model != hebrew_model() and not a.model:
-                print("  note: Hebrew is far better with the ivrit.ai model — "
-                      f"vf.py transcribe {proj.name} --language he --force")
+                print(f"  {name}: Hebrew — transcribing again with the ivrit.ai model (far better Hebrew)")
+                tmp.mkdir(exist_ok=True)
+                segs, _ = whisper_cpp_transcribe(path.resolve(), tmp, "he", a.prompt, hebrew_model())
+                shutil.rmtree(tmp)
+                engine = f"whisper.cpp {hebrew_model().parent.parent.parent.name}"
             if not vf_lang.stored(proj) or vf_lang.stored(proj) == "auto":
                 vf_lang.remember(proj, detected)
         data = {"meta": {"source": path.name, "engine": engine, "language": detected, "units": "seconds",

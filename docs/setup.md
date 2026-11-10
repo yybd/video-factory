@@ -28,8 +28,9 @@ Every project has one language, in `projects/<name>/project.json`. Set it with
 `vf.py new <name> … --language es`, or let the first transcription detect it (that needs the
 multilingual model). Transcription, filler removal, captions, the direction of graphics (right to left
 for Hebrew, Arabic, Persian…), the review page and the voice-over all follow it. A flag on one
-command overrides it for that run. With only the ivrit.ai model installed, say the language: it
-cannot detect one.
+command overrides it for that run. When detection hears Hebrew and the ivrit.ai model is installed,
+the source is transcribed again with it. With only the ivrit.ai model installed, say the language:
+it cannot detect one.
 
 ## Environment variables
 
