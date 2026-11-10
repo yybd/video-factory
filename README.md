@@ -1,5 +1,12 @@
 *English · [עברית](README.he.md)*
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/wordmark-dark.svg">
+    <img src="docs/assets/wordmark-light.svg" alt="video-factory" width="560">
+  </picture>
+</p>
+
 # video-factory
 
 Make videos by talking to Claude Code. Drop in raw footage, or write a script, and say what

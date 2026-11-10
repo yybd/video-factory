@@ -1,5 +1,12 @@
 *[English](README.md) · עברית*
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/wordmark-dark.svg">
+    <img src="docs/assets/wordmark-light.svg" alt="video-factory" width="560">
+  </picture>
+</p>
+
 <div dir="rtl">
 
 # video-factory
