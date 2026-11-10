@@ -1,0 +1,66 @@
+*English · [עברית](setup.he.md)*
+
+# Setup
+
+## Requirements
+
+| What | Why | Install (macOS) |
+|---|---|---|
+| Python 3.10+ | `tools/vf.py` and ffmpeg-skill (standard library only) | preinstalled / `brew install python` |
+| FFmpeg **with libass** | cutting, joining, burning captions | `brew install ffmpeg-full` (keg-only; `vf.py` finds it) |
+| whisper.cpp | transcription with word timings | comes with ffmpeg-full, or `brew install whisper-cpp` |
+| An ivrit.ai ggml model | accurate Hebrew | `hf download ivrit-ai/whisper-large-v3-ggml ggml-model.bin` (2.9 GB) or `…-turbo-ggml` (1.5 GB, faster) |
+| Node.js 22+ | motion graphics (HyperFrames, run with `npx`) | `brew install node` |
+| Google Chrome | HyperFrames renders HTML in headless Chrome | usually already installed; HyperFrames can fetch its own |
+| Claude Code | the orchestrator | [claude.com/claude-code](https://claude.com/claude-code) |
+
+The plain `ffmpeg` formula cannot burn captions (no libass). On Linux, the distribution's ffmpeg
+usually has libass. Check everything with:
+
+```bash
+python3 tools/vf.py doctor
+```
+
+## Environment variables
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `VF_WHISPER_MODEL` | ivrit.ai model in the Hugging Face cache | path to any whisper.cpp ggml model |
+| `VF_WHISPER_DTW` | from the model name | DTW alignment preset if the name does not say (`large.v3`, `large.v3.turbo`, …) |
+| `VF_FFMPEG_BIN` | Homebrew's ffmpeg-full | folder holding `ffmpeg` and `ffprobe` with libass |
+| `VF_LOCAL_MODELS` | — | optional fallback: a local-models project with `local-models transcribe` (sentence timings only) |
+| `HYPERFRAMES_NO_TELEMETRY` | `1` (set in `.claude/settings.json`) | keeps HyperFrames from sending usage events |
+| `ELEVENLABS_API_KEY`, `AZURE_SPEECH_KEY` + `AZURE_SPEECH_REGION`, `GOOGLE_TTS_API_KEY`, `OPENAI_API_KEY` | — | voice-over providers; see [Voice-over](voiceover.md) |
+
+API keys go in the shell or in a `.env` file at the repo root (or in a project folder). `.env` is
+gitignored. Never put a key in `story.json` or any tracked file.
+
+## Privacy
+
+Everything runs on your machine: transcription, cutting, graphics and captions. Two things touch
+the network:
+
+- **HyperFrames** loads the GSAP animation library from a CDN while rendering a graphic. No
+  footage is sent. Its telemetry is turned off for this repo.
+- **Voice-over providers** receive the script text you send them (only when you run `vf.py voice`
+  with an API provider).
+
+## Optional companion: `/watch`
+
+[claude-video](https://github.com/bradautomates/claude-video) (MIT) lets Claude watch a video
+from a URL: frames plus transcript. It is recommended for **reference** videos ("make it like
+this ad"), and it is not part of this repo. Install it in Claude Code with
+`/plugin marketplace add bradautomates/claude-video`, then `/plugin install watch@claude-video`.
+Its Gemini engine uploads the video to Google, so keep it away from client footage.
+
+## Troubleshooting
+
+| Symptom | Cause / fix |
+|---|---|
+| `filter subtitles MISSING` in doctor | plain ffmpeg — `brew install ffmpeg-full` |
+| `no transcription engine` | install whisper.cpp and an ivrit.ai model, or set `VF_WHISPER_MODEL` |
+| `… is a cloud placeholder` | the file is in iCloud / Google Drive and not downloaded — download it, or use `--copy` after downloading |
+| `HyperFrames render failed` | run the `npx hyperframes@0.9.27 check <dir>` it prints; usually a template edit broke the HTML |
+| Hebrew karaoke words in reverse order | the vendored caption.py patch is missing — see `.claude/skills/ffmpeg-skill/VENDORED.md` |
+| A part re-cuts every render | its kept ranges changed (snapping or cleaning moved them); expected once |
+| Render is slow | use `--draft` while editing; parts and graphics are cached between renders |

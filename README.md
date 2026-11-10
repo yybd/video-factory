@@ -2,55 +2,73 @@
 
 # video-factory
 
-Edit video by talking to Claude Code. Drop in raw footage and say what you want —
-*"cut this by topic, open with the tip about sleep, take out the ums, fade between parts,
-Hebrew captions"* — and get back a finished `final.mp4`.
+Make videos by talking to Claude Code. Drop in raw footage, or write a script, and say what
+you want: *"cut the interview by topic, open with a title card, a lower third for the CEO, cover
+the factory talk with b-roll, a chart of our growth, music, end card, Hebrew captions, and a
+vertical version for Reels"*. You get back a finished `final.mp4`.
 
 Built for Hebrew first: local Hebrew transcription (ivrit.ai Whisper) that times every word,
-and right-to-left captions rendered correctly, karaoke included. Everything runs locally:
-no cloud, no API keys, and your footage never leaves your machine.
+right-to-left captions and graphics rendered correctly, karaoke included. Editing runs locally,
+and your footage never leaves your machine.
+
+**Full documentation: [docs/](docs/README.md)**: setup, workflow, every command, the
+story.json reference, motion graphics, voice-over, delivery.
 
 ## What it does
 
-The **video-orchestrator** skill conducts the whole edit:
+The **video-orchestrator** skill conducts the whole production, in two modes:
+**footage-led** (interviews, events, testimonials: what is said sets the story) and
+**script-led** (product promos, explainers: a narrated script sets the timing).
 
-1. **Transcribe**: a transcript of every clip with a time for every word.
-2. **Look**: for footage without speech (b-roll, travel, events), timecoded contact sheets
-   and a list of scene changes. Claude looks at them and writes down what each shot shows.
-3. **Segment by meaning**: Claude splits the footage into parts, one idea or one moment
-   each. Cuts that land inside a word are moved to the silence outside it.
-   **Exact seconds** work too: say "from 1:20 to 1:45" and that is where it cuts.
-4. **Build a story**: Claude picks and orders the parts (hook, beats, ending), explains
-   each choice, and waits for your approval.
-5. **Clean**: optionally remove hesitation sounds (אממ, אה) and shorten long pauses inside
-   each part. Captions follow the cuts.
-6. **Join with transitions**: fade, dissolve, fade-to-black, wipes, slides and more,
-   with resolution, frame rate and audio normalised across clips.
-7. **Caption**: the transcript is re-timed onto the final edit, corrected, and burned in
-   with a Hebrew font, right-to-left, two lines at most. Optional karaoke highlights each
-   word as it is spoken.
-8. **Check**: a contact sheet of the result that Claude looks at before reporting.
+**Editing**
+- **Transcribe** with a time for every word. **Look** at footage without speech through
+  timecoded contact sheets, and Claude writes down what each shot shows.
+- **Segment by meaning**: parts of one idea or one moment each, with cuts moved out of words.
+  Or cut at **exact seconds**.
+- **Build a story** with a reason for each part, and **wait for your approval**.
+- **Clean** hesitation sounds (אממ, אה) and long pauses; captions follow the cuts.
+- **Join with transitions** (fade, fade-to-black, dissolve, wipes, slides…).
 
-Anything else (loudness to -14 LUFS, logo, lower thirds, speed ramps, color, stabilization,
-platform exports for YouTube, Reels or TikTok) comes from the vendored
-[ffmpeg-skill](https://github.com/kajisho5/ffmpeg-skill) (42 tools, MIT).
+**Promo layer**
+- **Brand kit**: colours, logo and font applied to captions and every graphic.
+- **Motion graphics and infographics** ([HyperFrames](https://github.com/heygen-com/hyperframes)):
+  title cards, lower thirds, counting numbers, bar charts and end cards, all right-to-left, as
+  full-screen cards or transparent overlays, plus custom animations built on demand.
+- **B-roll over speech**: Claude matches what is said to what was filmed and cuts away.
+- **Music** that ducks under speech, cut on the beat if you want. **Colour look** (LUT or correction).
+- **Voice-over from a script** through a TTS provider (ElevenLabs, Azure, Google, OpenAI, or the
+  free macOS voice for timing). Visuals are timed to each beat and captions follow the narration.
+
+**Delivery**
+- **Captions** re-timed onto the final edit, right-to-left, optional karaoke, plus
+  **second-language subtitles** (toggleable or burned).
+- **Versions** from one story: vertical for Reels, 30 s, 15 s.
+- **Client review page**: the client leaves notes at moments, and Claude applies them.
+- **Editor timeline** export (Final Cut / Resolve / Premiere) and **platform checks**.
+- **Pre-production**: brief, shot list and interview questions before filming, and a coverage
+  check after.
+
+Everything else (loudness, audio clean-up, speed ramps, stabilisation, redaction, chapters,
+platform exports) comes from the vendored [ffmpeg-skill](https://github.com/kajisho5/ffmpeg-skill)
+(42 tools, MIT).
 
 ## Requirements
 
 - macOS or Linux, Python 3.10+
 - **FFmpeg with libass**: `brew install ffmpeg-full` on macOS. The plain `ffmpeg` formula
-  cannot burn captions. On Linux, the distro ffmpeg usually has libass.
-- **whisper.cpp** (`brew install whisper-cpp`; it also comes with ffmpeg-full) and an
-  [ivrit.ai](https://huggingface.co/ivrit-ai) Hebrew ggml model, found automatically in the
-  Hugging Face cache:
+  cannot burn captions.
+- **whisper.cpp** (comes with ffmpeg-full) and an [ivrit.ai](https://huggingface.co/ivrit-ai)
+  Hebrew model, found automatically in the Hugging Face cache:
   ```bash
   pip install -U huggingface_hub
   hf download ivrit-ai/whisper-large-v3-turbo-ggml ggml-model.bin   # 1.5 GB, fast
   hf download ivrit-ai/whisper-large-v3-ggml ggml-model.bin         # 2.9 GB, more accurate (preferred when present)
   ```
-  Or point `VF_WHISPER_MODEL` at any ggml model. For other languages, use a stock Whisper
-  model and `--language`.
+- **Node.js 22+** and Chrome, for motion graphics (HyperFrames runs through `npx`)
+- Optional: an API key for a voice-over provider, in `.env` (gitignored)
 - [Claude Code](https://claude.com/claude-code)
+
+Details, environment variables and troubleshooting: [docs/setup.md](docs/setup.md).
 
 ## Quick start
 
@@ -64,6 +82,12 @@ Then, in Claude Code:
 
 > Make a project called *trip* from ~/Movies/trip, cut it by topic into a 2-minute story,
 > take out the ums, and add Hebrew karaoke captions.
+
+> Make a 45-second promo for ACME from ~/Footage/acme: the CEO interview, b-roll of the factory,
+> our logo and colours, a chart of customers by year, music, and a Reels version.
+
+> Write a 30-second script for our app, narrate it with Azure, and cut the screen recordings
+> in ~/Desktop/app to it.
 
 You don't need to prepare or copy anything. Point at a folder or at files, and the project
 links to them; your originals are never modified. Ask for a copy (`--copy`) when the footage
@@ -159,6 +183,55 @@ and tells you which.
 | "Is it OK to upload to YouTube / Reels / TikTok?" | platform checks: size, length, loudness, codec |
 | "Export for YouTube" / "under 25 MB" / "a GIF preview" | platform exports |
 
+### Planning (before filming)
+
+| Ask | What happens |
+|---|---|
+| "Help me plan a promo for X" | brief: goal, audience, one message, call to action, length |
+| "What should I film?" / "interview questions for the CEO" | shot list and questions that make good sound bites |
+| "Did I film everything?" | compares the footage and transcripts with the shot list |
+
+### Brand and motion graphics
+
+| Ask | What happens |
+|---|---|
+| "Our colours are #FFB000 and navy, here's the logo" | `brand.json`; captions and every graphic use it |
+| "Open with a title card: 'מבשלים חכם'" | full-screen title card in the brand colours |
+| "Lower third for the CEO: Israel Israeli, CEO" | name and role over the footage, above the captions |
+| "Show 98% satisfaction when he says it" | a number that counts up, over the footage or as a card |
+| "A chart of customers per year: 12, 19, 31" | animated bar chart, right-to-left |
+| "End with our website and phone" | end card with logo and call to action |
+| "Our logo in the corner the whole time" | logo overlay |
+| "An animation that shows the 3 steps of the process" | a custom graphic built with HyperFrames |
+
+### B-roll, music and look
+
+| Ask | What happens |
+|---|---|
+| "Cover him with factory shots when he talks about the factory" | b-roll matched to the words; the voice continues |
+| "Music under it" / "quieter" / "cut on the beat" | ducked music bed; beat grid for timing |
+| "Make the two cameras match" / "warmer" / "apply this LUT" | one colour pass over the edit |
+
+### Voice-over and product videos
+
+| Ask | What happens |
+|---|---|
+| "Write a 30-second script for the app" | `script.md`, one beat per paragraph, with visual notes |
+| "Narrate it" (free draft voice) / "…with Azure, male voice" / "…with ElevenLabs voice X" | narration per beat, timed and transcribed |
+| "Redo beat 2, slower" | re-voices one beat |
+| "Cut the screen recordings to the voice" | visuals fitted beat by beat; captions follow the narration |
+| "Keep the room sound under the narration" | voice mixed over the footage's sound |
+
+### Versions, translation and review
+
+| Ask | What happens |
+|---|---|
+| "A vertical version for Reels" / "a 15-second cut" | `versions` in the story, rendered from the same edit |
+| "English subtitles too" / "burned in" | translated subtitle track (toggleable) or burned at the top |
+| "Make a review page for the client" | page where the client leaves notes at moments |
+| "Here are the client's notes: …" | each note mapped to a part and applied |
+| "Send it to my editor in Premiere / Resolve" | FCPXML / EDL timeline of the cut |
+
 ### Polishing the result (ffmpeg-skill tools)
 
 | Ask | What happens |
@@ -179,31 +252,56 @@ and tells you which.
 ## Layout
 
 ```
-.claude/skills/video-orchestrator/   the conductor skill: stages, rules, story.json schema
-.claude/skills/ffmpeg-skill/         vendored executor (MIT, kajisho5): 42 ffmpeg tools (local patches: VENDORED.md)
-tools/vf.py                          the mechanical CLI the skill drives
+.claude/skills/video-orchestrator/   the conductor skill: modes, stages, rules
+.claude/skills/ffmpeg-skill/         vendored executor (MIT, kajisho5): 42 ffmpeg tools (local patch: VENDORED.md)
+.agents/skills/                      HyperFrames skills (Apache-2.0), linked into .claude/skills/
+templates/motion/                    motion graphics templates: lower-third, title, end-card, stat, bar-chart
+tools/vf.py                          the CLI the skill drives (+ vf_motion.py, vf_voice.py, vf_review.py)
 tools/fillers.he.txt                 Hebrew hesitation sounds that "clean" removes
+docs/                                full documentation, English and Hebrew
 projects/<name>/                     your projects: gitignored, never committed
 ```
 
-`tools/vf.py` also works on its own:
+`tools/vf.py` also works on its own (every command: [docs/cli.md](docs/cli.md)):
 
 ```bash
 python3 tools/vf.py new demo ~/Movies/trip       # a folder or files; --copy to copy
 python3 tools/vf.py transcribe demo              # word timings
 python3 tools/vf.py frames demo                  # contact sheets + scenes, for footage without speech
 python3 tools/vf.py transcript demo --words      # read it, then write projects/demo/story.json
+python3 tools/vf.py voice demo --provider say    # narration from script.md
 python3 tools/vf.py render demo --draft
-python3 tools/vf.py render demo
+python3 tools/vf.py render demo --version reels
+python3 tools/vf.py review demo                  # client notes page
+python3 tools/vf.py export demo --format fcpxml  # editor timeline
 python3 tools/vf.py ff <tool> --help             # any ffmpeg-skill tool, with the right ffmpeg
 ```
+
+## Recommended companion: `/watch`
+
+[claude-video](https://github.com/bradautomates/claude-video) (MIT) lets Claude **watch** a
+video from a URL or a file: frames plus transcript. It does not edit. Use it for **reference**
+videos ("make our promo feel like this ad"): Claude watches the ad and breaks down its pacing,
+transitions and graphics before planning yours. It is a separate plugin and not part of this repo:
+
+```
+/plugin marketplace add bradautomates/claude-video
+/plugin install watch@claude-video
+```
+
+Its optional Gemini engine uploads the video to Google, so keep client footage on video-factory's
+own local tools.
 
 ## Current limitations
 
 - One transition type for the whole video.
 - Karaoke highlights a word from the end of the previous word until its own end, so the
   highlight leads the voice slightly.
+- The API voice-over providers follow each provider's documented API but have not yet been run
+  against a live key here. The free macOS voice is tested.
+- Motion templates are designed at 16:9. Vertical versions re-flow them, so check the draft.
 
 ## License
 
-MIT. See [LICENSE](LICENSE). `ffmpeg-skill` is MIT, © kajisho5; see its own LICENSE.
+MIT. See [LICENSE](LICENSE). Third-party components (ffmpeg-skill MIT, HyperFrames skills
+Apache-2.0, and others): [THIRD_PARTY.md](THIRD_PARTY.md).
