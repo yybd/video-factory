@@ -57,6 +57,15 @@
       const D = parseFloat(root.dataset.duration);
       const num = document.getElementById("num");
       const fmt = (x) => v.prefix + Number(x).toLocaleString("en-US", { minimumFractionDigits: v.decimals, maximumFractionDigits: v.decimals }) + v.suffix;
+      // Fit the widest state (the final value) and the label into the frame: a long number such as
+      // 1,800,000 is wider than a vertical (1080 px) frame at the full 260 px size.
+      const fit = (el, base) => {
+        const maxW = root.clientWidth * 0.88;
+        if (el.scrollWidth > maxW) el.style.fontSize = Math.floor(base * maxW / el.scrollWidth) + "px";
+      };
+      num.textContent = fmt(v.value);
+      fit(num, 260);
+      fit(document.getElementById("label"), 64);
       const counter = { x: 0 };
       num.textContent = fmt(0);
       const tl = gsap.timeline({ paused: true });

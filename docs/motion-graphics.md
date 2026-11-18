@@ -43,7 +43,8 @@ format, so the same file also styles its graphics and captions.
 Templates are authored at 1920×1080. For another output size (a vertical version), vf.py
 rewrites the composition's size before rendering, and the layouts are mostly relative. Check
 a vertical draft's sheet. A graphic that does not fit needs a vertical variant: copy it to
-`projects/<name>/motion/<name>-vertical/` and adjust it.
+`projects/<name>/motion/<name>-vertical/` and adjust it. `stat` fits itself: a number or label wider
+than 88% of the frame (1,800,000 in a 1080 px vertical frame) is set smaller to fit.
 
 ## Custom graphics
 
