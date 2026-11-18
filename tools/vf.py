@@ -1103,9 +1103,15 @@ def fps_float(fps: str) -> float:
 def join_mixed(part_files: list[Path], lengths: list[float], junc: list[tuple[str, float]], W: int, H: int,
                FPS: str, fit: str, out: Path, draft: bool) -> None:
     """Join parts with a different transition at each junction (ffmpeg-skill's join takes one).
-    Every part is normalised (size, fit, fps, pixel format, 48 kHz stereo), then chained with
-    xfade + acrossfade. A "none" junction is a one-frame fade — a cut, visually."""
-    one_frame = 1.0 / fps_float(FPS)
+    Every part is normalised (size, fit, fps, pixel format, 48 kHz stereo). Runs of parts joined
+    by "none" are concatenated (a plain cut, no overlap); the runs are then chained with
+    xfade + acrossfade at the real transitions.
+
+    A cut used to be a one-frame xfade. On FFmpeg 9 a long chain of those ends early — every
+    later part is dropped and the player holds the last frame over the rest, while audio,
+    captions and overlays carry on. concat has no such failure, and keeps cuts frame-exact."""
+    fps = fps_float(FPS)
+    lengths = [max(1, round(L * fps)) / fps for L in lengths]  # whole frames, so picture and sound agree
     cmd = [ffbin("ffmpeg"), "-v", "error", "-y"]
     for f in part_files:
         cmd += ["-i", str(f)]
@@ -1117,12 +1123,8 @@ def join_mixed(part_files: list[Path], lengths: list[float], junc: list[tuple[st
             geo = f"scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H}"
         else:
             geo = f"scale={W}:{H}:force_original_aspect_ratio=decrease,pad={W}:{H}:(ow-iw)/2:(oh-ih)/2:color=black"
-        # Two things keep xfade from ending the chain early — which drops every later part and
-        # leaves the player holding the last frame:
-        # - tpad holds the last frame, so a part that comes out a frame shorter than planned
-        #   (a 24 fps cut that lands between frames) still reaches its xfade;
-        # - no settb=AVTB: fps= already gives every part the same 1/fps time base, and on
-        #   FFmpeg 9 an AVTB time base with the one-frame xfade of a "none" junction ends the chain.
+        # tpad holds the last frame, so a part that comes out a frame shorter than planned (a 24 fps
+        # cut that lands between frames) still fills its length; fps= gives every part one time base.
         chains.append(f"[{i}:v]{geo},setsar=1,fps={FPS},format=yuv420p,setpts=PTS-STARTPTS,"
                       f"tpad=stop_mode=clone:stop_duration=1,trim=duration={L:.3f}[v{i}]")
         if has_audio:
@@ -1132,15 +1134,34 @@ def join_mixed(part_files: list[Path], lengths: list[float], junc: list[tuple[st
             cmd += ["-f", "lavfi", "-t", f"{L:.3f}", "-i", "anullsrc=r=48000:cl=stereo"]
             chains.append(f"[{n_in}:a]atrim=duration={L:.3f}[a{i}]")
             n_in += 1
-    vlast, alast, cum = "[v0]", "[a0]", lengths[0]
+    # runs of parts separated by plain cuts
+    runs, this_run = [], [0]
     for i in range(1, len(part_files)):
         typ, d = junc[i]
         if typ == "none" or d <= 0:
-            typ, d = "fade", max(d, one_frame)
+            this_run.append(i)
+        else:
+            runs.append(this_run)
+            this_run = [i]
+    runs.append(this_run)
+    labels = []  # (video, audio, length) per run
+    for g, r in enumerate(runs):
+        if len(r) == 1:
+            labels.append((f"[v{r[0]}]", f"[a{r[0]}]", lengths[r[0]]))
+            continue
+        pairs = "".join(f"[v{i}][a{i}]" for i in r)
+        # concat hands out a 1/1000000 time base; xfade needs the same 1/fps as a single part
+        chains.append(f"{pairs}concat=n={len(r)}:v=1:a=1[gc{g}][ga{g}]")
+        chains.append(f"[gc{g}]fps={FPS}[gv{g}]")
+        labels.append((f"[gv{g}]", f"[ga{g}]", sum(lengths[i] for i in r)))
+    vlast, alast, cum = labels[0][0], labels[0][1], labels[0][2]
+    for g in range(1, len(runs)):
+        typ, d = junc[runs[g][0]]
+        v, a_, L = labels[g]
         off = cum - d
-        chains.append(f"{vlast}[v{i}]xfade=transition={typ}:duration={d:.3f}:offset={off:.3f}[vx{i}]")
-        chains.append(f"{alast}[a{i}]acrossfade=d={d:.3f}:c1=tri:c2=tri[ax{i}]")
-        vlast, alast, cum = f"[vx{i}]", f"[ax{i}]", cum + lengths[i] - d
+        chains.append(f"{vlast}{v}xfade=transition={typ}:duration={d:.3f}:offset={off:.3f}[vx{g}]")
+        chains.append(f"{alast}{a_}acrossfade=d={d:.3f}:c1=tri:c2=tri[ax{g}]")
+        vlast, alast, cum = f"[vx{g}]", f"[ax{g}]", cum + L - d
     cmd += ["-filter_complex", ";".join(chains), "-map", vlast, "-map", alast, "-c:v", "libx264",
             "-preset", "veryfast" if draft else "medium", "-crf", "18", "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(out)]
@@ -1172,9 +1193,8 @@ def render_story(proj: Path, story: dict, name: str, a) -> list[str]:
         tdur = 0.0
     junc = junctions(story)  # the transition into each part
     mixed = len(set(junc[1:])) > 1 or (len(junc) > 1 and junc[1] != (ttype, tdur))
-    if mixed:  # a "none" junction is a one-frame fade there, and the timeline must count that frame
-        frame = 1.0 / fps_float(FPS)
-        junc = [junc[0]] + [("none", frame) if (t == "none" or d <= 0) else (t, d) for t, d in junc[1:]]
+    if mixed:  # a "none" junction is a plain cut there (join_mixed concatenates it): no overlap
+        junc = [junc[0]] + [("none", 0.0) if (t == "none" or d <= 0) else (t, d) for t, d in junc[1:]]
     stages = proj / "renders" / f".stages-{name}"
     stages.mkdir(parents=True, exist_ok=True)
     fast = ["--fast"] if a.draft else []
