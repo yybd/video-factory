@@ -235,6 +235,13 @@ def whisper_cpp_transcribe(path: Path, workdir: Path, language: str, prompt: str
     if prompt:
         cmd += ["--prompt", prompt]
     r = run(cmd, capture_output=True, text=True)
+    if r.returncode != 0 and preset:
+        # whisper.cpp's DTW can abort (exit 134) partway through some audio. Word times then come
+        # from the decoder's own offsets — a little less exact, but the words are all there.
+        print("  whisper.cpp's word alignment (DTW) failed on this audio; transcribing without it",
+              file=sys.stderr)
+        cmd = [c for c in cmd if c not in ("-dtw", preset, "-nfa")]
+        r = run(cmd, capture_output=True, text=True)
     if r.returncode != 0:
         sys.stderr.write(r.stderr[-2000:])
         sys.exit("whisper.cpp failed")
