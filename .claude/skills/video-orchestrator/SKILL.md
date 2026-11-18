@@ -121,6 +121,10 @@ sheet. Check that captions are inside the frame and read in the language's direc
 caption or a face, and that the logo does not fight a lower third.
 
 Every render ends with a QA check (length vs plan, size, streams, captions, subtitle tracks).
+**QA passing is not seeing the picture.** A join that stops early leaves the player holding the last
+frame for the rest of the video while the audio, captions and overlays carry on, and the length
+check still passes. Always read the draft sheet, or `ff look renders/draft.mp4 --tiles 4x4`, before
+reporting a render (found 2026-11 and fixed in `join_mixed`; the check can miss it again).
 Exit code 2 = something is off. Never report such a render as done; fix the cause first.
 With a vision model set, `python3 tools/vf.py watch <name> --task qa [--render draft]` adds a second pair
 of eyes (text over faces, cut-off heads, black frames, hidden logo). Look at each flagged moment

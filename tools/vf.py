@@ -1117,8 +1117,14 @@ def join_mixed(part_files: list[Path], lengths: list[float], junc: list[tuple[st
             geo = f"scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H}"
         else:
             geo = f"scale={W}:{H}:force_original_aspect_ratio=decrease,pad={W}:{H}:(ow-iw)/2:(oh-ih)/2:color=black"
+        # Two things keep xfade from ending the chain early — which drops every later part and
+        # leaves the player holding the last frame:
+        # - tpad holds the last frame, so a part that comes out a frame shorter than planned
+        #   (a 24 fps cut that lands between frames) still reaches its xfade;
+        # - no settb=AVTB: fps= already gives every part the same 1/fps time base, and on
+        #   FFmpeg 9 an AVTB time base with the one-frame xfade of a "none" junction ends the chain.
         chains.append(f"[{i}:v]{geo},setsar=1,fps={FPS},format=yuv420p,setpts=PTS-STARTPTS,"
-                      f"trim=duration={L:.3f},settb=AVTB[v{i}]")
+                      f"tpad=stop_mode=clone:stop_duration=1,trim=duration={L:.3f}[v{i}]")
         if has_audio:
             chains.append(f"[{i}:a:0]aresample=48000,aformat=sample_rates=48000:channel_layouts=stereo,"
                           f"asetpts=PTS-STARTPTS,apad,atrim=duration={L:.3f}[a{i}]")
